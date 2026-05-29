@@ -131,7 +131,7 @@ The visual reviewer writes concrete diffs in this format:
 The checklist fields are the reviewer's source-derived acceptance criteria:
 
 - `topology_checklist` is for visible source graph facts: arrow direction, endpoints, route shape, branches, merges, shared trunks, boundary crossings, operator order, and required special components. It is not a schema check; it comes from visual comparison of the original source and replica.
-- `visual_checklist` is for local appearance facts: overlap, line-through-text, label wrapping, bracket/tensor spacing, tensor thickness, title position, font role, line weight, color, rounding, and shadow.
+- `visual_checklist` is for local appearance and visual grammar facts: overlap, line-through-text, label wrapping, cell count/gap/rounding, symbol internals, sampled wave shape, bracket/tensor spacing, tensor thickness, title position, font role, line weight, color, rounding, and shadow.
 - `status` should be `pass`, `fail`, or `uncertain`. Use `uncertain` when the source crop is unclear; do not invent topology.
 - Findings should cite failed checklist ids through `checklist_refs` when possible.
 - A review may include passing checklist items. They help later rounds avoid regressing details that already match.

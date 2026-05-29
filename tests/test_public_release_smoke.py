@@ -135,6 +135,28 @@ def test_rounded_orthogonal_example_passes_strict_contract() -> None:
     assert "Scene is valid" in result.stdout
 
 
+def test_visual_grammar_primitives_example_passes_strict_contract() -> None:
+    example = ROOT / "templates" / "examples" / "visual_grammar_primitives.scene.json"
+    result = run_script("scene_validate.py", str(example), "--strict")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Scene is valid" in result.stdout
+
+
+def test_polyline_wave_requires_explicit_shape_in_strict_mode(tmp_path: Path) -> None:
+    source = ROOT / "templates" / "examples" / "visual_grammar_primitives.scene.json"
+    scene_doc = json.loads(source.read_text(encoding="utf-8"))
+    for node in scene_doc["nodes"]:
+        if node.get("id") == "output_wave":
+            node.pop("samples", None)
+            node.pop("points", None)
+    scene = tmp_path / "bad_wave.scene.json"
+    scene.write_text(json.dumps(scene_doc, ensure_ascii=False), encoding="utf-8")
+
+    result = run_script("scene_validate.py", str(scene), "--strict")
+    assert result.returncode != 0
+    assert "polyline_wave `output_wave`" in (result.stdout + result.stderr)
+
+
 def test_review_bundle_and_checklist_gate(tmp_path: Path) -> None:
     original = tmp_path / "original.png"
     replica = tmp_path / "replica.png"

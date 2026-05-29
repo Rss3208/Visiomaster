@@ -24,6 +24,12 @@
       "symbol",
       "source_bbox_px",
       "source_bbox",
+      "primitive_family",
+      "motif_binding",
+      "visual_facts",
+      "source_visual_facts",
+      "must_match_facts",
+      "subshape_role",
       "orientation",
       "container_id",
       "align_to_container",
@@ -63,6 +69,7 @@
     "common_edge_effective_fields": [
       "from",
       "to",
+      "edge_role",
       "arrow_plan_id",
       "source_arrow_id",
       "semantic_intent",
@@ -253,6 +260,105 @@
         "source_aspect_ratio"
       ],
       "weak_fields": []
+    },
+    "cell_strip": {
+      "effective_fields": [
+        "cell_count",
+        "count",
+        "cells_count",
+        "rows",
+        "cols",
+        "columns",
+        "cells",
+        "labels",
+        "cell_gap_in",
+        "gap_in",
+        "cell_rounding_in",
+        "continuous",
+        "source_visual_facts",
+        "must_match_facts"
+      ],
+      "weak_fields": [
+        "cell_fill",
+        "cell_line",
+        "cell_line_weight_pt"
+      ]
+    },
+    "micro_grid": {
+      "effective_fields": [
+        "rows",
+        "cols",
+        "columns",
+        "cells",
+        "cell_gap_in",
+        "cell_rounding_in",
+        "source_visual_facts",
+        "must_match_facts"
+      ],
+      "weak_fields": [
+        "cell_fill",
+        "cell_line",
+        "cell_line_weight_pt"
+      ]
+    },
+    "polyline_wave": {
+      "effective_fields": [
+        "points",
+        "samples",
+        "baseline_ratio",
+        "amplitude_in",
+        "source_visual_facts",
+        "must_match_facts"
+      ],
+      "weak_fields": [
+        "line",
+        "line_weight_pt"
+      ]
+    },
+    "symbol_group": {
+      "effective_fields": [
+        "symbol_kind",
+        "subshapes",
+        "parts",
+        "primitives",
+        "source_visual_facts",
+        "must_match_facts"
+      ],
+      "weak_fields": [
+        "fill",
+        "line",
+        "line_weight_pt"
+      ]
+    },
+    "primitive_group": {
+      "effective_fields": [
+        "shape",
+        "subshapes",
+        "parts",
+        "primitives",
+        "source_visual_facts",
+        "must_match_facts"
+      ],
+      "weak_fields": [
+        "fill",
+        "line",
+        "line_weight_pt"
+      ]
+    },
+    "shape_cluster": {
+      "effective_fields": [
+        "shape",
+        "subshapes",
+        "parts",
+        "primitives",
+        "source_visual_facts",
+        "must_match_facts"
+      ],
+      "weak_fields": [
+        "fill",
+        "line",
+        "line_weight_pt"
+      ]
     }
   }
 }

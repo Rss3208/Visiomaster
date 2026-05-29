@@ -3008,6 +3008,282 @@ def draw_wave_signal(page: Any, page_height: float, node: dict[str, Any], style:
     return shape
 
 
+def primitive_style(base_style: dict[str, Any], item: dict[str, Any], extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    item_style = item.get("style") if isinstance(item.get("style"), dict) else None
+    merged = merge_style(base_style, extra, item_style)
+    for key in (
+        "fill",
+        "line",
+        "line_weight_pt",
+        "line_dash",
+        "text_color",
+        "font_family",
+        "font_family_candidates",
+        "font_role",
+        "font_size_pt",
+        "font_weight",
+        "font_italic",
+        "text_fit",
+        "text_align",
+        "vertical_align",
+        "text_margin_in",
+        "rounding_in",
+        "end_arrow",
+        "begin_arrow",
+        "arrow_size",
+    ):
+        if key in item:
+            merged[key] = item[key]
+    return merged
+
+
+def primitive_local_box(node: dict[str, Any], item: dict[str, Any]) -> dict[str, float]:
+    x = float(node["x"])
+    y = float(node["y"])
+    width = float(node["w"])
+    height = float(node["h"])
+    bbox = item.get("bbox")
+    if isinstance(bbox, list) and len(bbox) == 4:
+        return {
+            "x": x + relative_or_absolute(bbox[0], width),
+            "y": y + relative_or_absolute(bbox[1], height),
+            "w": relative_or_absolute(bbox[2], width),
+            "h": relative_or_absolute(bbox[3], height),
+        }
+    item_w = relative_or_absolute(item.get("w", item.get("width", width)), width)
+    item_h = relative_or_absolute(item.get("h", item.get("height", height)), height)
+    anchor = str(item.get("anchor", "top_left")).lower()
+    local_x = relative_or_absolute(item.get("x", item.get("cx", 0.0)), width)
+    local_y = relative_or_absolute(item.get("y", item.get("cy", 0.0)), height)
+    if "cx" in item or anchor in {"center", "centre", "middle"}:
+        item_x = x + local_x - item_w / 2
+        item_y = y + local_y - item_h / 2
+    else:
+        item_x = x + local_x
+        item_y = y + local_y
+    return {"x": item_x, "y": item_y, "w": item_w, "h": item_h}
+
+
+def primitive_local_point(node: dict[str, Any], raw: Any) -> tuple[float, float] | None:
+    if not isinstance(raw, list) or len(raw) != 2:
+        return None
+    try:
+        x = float(node["x"]) + relative_or_absolute(raw[0], float(node["w"]))
+        y = float(node["y"]) + relative_or_absolute(raw[1], float(node["h"]))
+        return x, y
+    except (TypeError, ValueError):
+        return None
+
+
+def primitive_points(node: dict[str, Any], raw_points: Any) -> list[tuple[float, float]]:
+    if not isinstance(raw_points, list):
+        return []
+    points: list[tuple[float, float]] = []
+    for raw_point in raw_points:
+        point = primitive_local_point(node, raw_point)
+        if point is not None:
+            points.append(point)
+    return points
+
+
+def draw_polyline_wave(page: Any, page_height: float, node: dict[str, Any], style: dict[str, Any]) -> Any:
+    x = float(node["x"])
+    y = float(node["y"])
+    width = float(node["w"])
+    height = float(node["h"])
+    points = primitive_points(node, node.get("points"))
+    if not points:
+        samples = node.get("samples")
+        if isinstance(samples, list) and samples:
+            values = [float(item) for item in samples if isinstance(item, (int, float))]
+            if len(values) == 1:
+                values = [values[0], values[0]]
+            baseline = y + height * float(node.get("baseline_ratio", 0.5))
+            amplitude = float(node.get("amplitude_in", height * float(node.get("amplitude_ratio", style.get("amplitude_ratio", 0.38)))))
+            points = [
+                (x + width * index / max(1, len(values) - 1), baseline - max(-1.0, min(1.0, value)) * amplitude)
+                for index, value in enumerate(values)
+            ]
+    if not points:
+        # Non-strict fallback only. Strict validation requires samples/points so exact replicas do not silently become sine waves.
+        baseline = y + height * float(node.get("baseline_ratio", 0.5))
+        points = [(x, baseline), (x + width, baseline)]
+    line_style = merge_style(style, {"fill": "none", "end_arrow": node.get("end_arrow", style.get("end_arrow", "none"))})
+    return draw_single_path(page, page_height, points, line_style, "polyline")
+
+
+def draw_cell_strip(page: Any, page_height: float, node: dict[str, Any], style: dict[str, Any]) -> Any:
+    x = float(node["x"])
+    y = float(node["y"])
+    width = float(node["w"])
+    height = float(node["h"])
+    orientation = str(node.get("orientation", style.get("orientation", "horizontal"))).lower()
+    if orientation in {"vertical", "v", "column", "col"}:
+        cols = int(node.get("cols", node.get("columns", 1)))
+        rows = int(node.get("rows", node.get("cell_count", node.get("count", node.get("cells_count", 1)))))
+    else:
+        rows = int(node.get("rows", 1))
+        cols = int(node.get("cols", node.get("columns", node.get("cell_count", node.get("count", node.get("cells_count", 1))))))
+    rows = max(1, rows)
+    cols = max(1, cols)
+    gap = float(node.get("cell_gap_in", node.get("gap_in", style.get("cell_gap_in", 0.0))) or 0.0)
+    cell_w = max(0.01, (width - gap * (cols - 1)) / cols)
+    cell_h = max(0.01, (height - gap * (rows - 1)) / rows)
+    raw_cells = node.get("cells", [])
+    cells = raw_cells if isinstance(raw_cells, list) else []
+    labels = node.get("labels")
+    label_list = labels if isinstance(labels, list) else []
+    default_cell_style = {
+        "fill": style.get("cell_fill", style.get("fill", "#FFFFFF")),
+        "line": style.get("cell_line", style.get("line", "#111827")),
+        "line_weight_pt": style.get("cell_line_weight_pt", style.get("line_weight_pt", 0.55)),
+        "line_dash": style.get("line_dash", "solid"),
+        "rounding_in": node.get("cell_rounding_in", node.get("rounding_in", style.get("cell_rounding_in", 0.0))),
+        "text_fit": "single_line",
+        "min_font_size_pt": node.get("cell_min_font_size_pt", style.get("cell_min_font_size_pt", 4.5)),
+        "text_margin_in": node.get("cell_text_margin_in", style.get("text_margin_in", 0.0)),
+    }
+    first_shape = None
+    for row in range(rows):
+        for col in range(cols):
+            index = row * cols + col
+            raw_cell = cells[index] if index < len(cells) else {}
+            cell = raw_cell if isinstance(raw_cell, dict) else {"text": raw_cell} if raw_cell not in {None, ""} else {}
+            cell_node = {
+                "x": x + col * (cell_w + gap),
+                "y": y + row * (cell_h + gap),
+                "w": cell_w,
+                "h": cell_h,
+            }
+            shape = draw_rectangle(page, page_height, cell_node)
+            cell_style = primitive_style(style, cell, default_cell_style)
+            apply_style(shape, cell_style, str(cell.get("text", label_list[index] if index < len(label_list) else "")))
+            first_shape = shape if first_shape is None else first_shape
+    return first_shape
+
+
+def draw_micro_grid(page: Any, page_height: float, node: dict[str, Any], style: dict[str, Any]) -> Any:
+    grid_node = dict(node)
+    if "rows" not in grid_node:
+        grid_node["rows"] = int(node.get("grid_rows", 2))
+    if "cols" not in grid_node and "columns" not in grid_node:
+        grid_node["cols"] = int(node.get("grid_cols", 2))
+    return draw_cell_strip(page, page_height, grid_node, style)
+
+
+def draw_primitive_subshape(page: Any, page_height: float, node: dict[str, Any], item: dict[str, Any], style: dict[str, Any]) -> Any | None:
+    shape_kind = str(item.get("shape", item.get("kind", item.get("type", "rect")))).lower()
+    item_style = primitive_style(style, item)
+    if shape_kind in {"rect", "rectangle", "rounded_rect", "rounded_rectangle", "square"}:
+        box = primitive_local_box(node, item)
+        shape = draw_rectangle(page, page_height, box)
+        if shape_kind in {"rounded_rect", "rounded_rectangle"} and "rounding_in" not in item_style:
+            item_style["rounding_in"] = min(float(box["w"]), float(box["h"])) * 0.10
+        apply_style(shape, item_style, str(item.get("text", "")))
+        return shape
+    if shape_kind in {"circle", "ellipse", "oval", "dot"}:
+        box = primitive_local_box(node, item)
+        shape = draw_oval(page, page_height, box)
+        apply_style(shape, item_style, str(item.get("text", "")))
+        return shape
+    if shape_kind in {"triangle", "polygon"}:
+        points = primitive_points(node, item.get("points"))
+        if not points:
+            box = primitive_local_box(node, item)
+            points = [
+                (box["x"] + box["w"] / 2, box["y"]),
+                (box["x"] + box["w"], box["y"] + box["h"]),
+                (box["x"], box["y"] + box["h"]),
+            ]
+        shape = draw_polygon_from_points(page, page_height, points)
+        apply_style(shape, item_style)
+        return shape
+    if shape_kind in {"line", "segment"}:
+        start = primitive_local_point(node, item.get("from", item.get("start")))
+        end = primitive_local_point(node, item.get("to", item.get("end")))
+        if start is None or end is None:
+            box = primitive_local_box(node, item)
+            start = (box["x"], box["y"] + box["h"] / 2)
+            end = (box["x"] + box["w"], box["y"] + box["h"] / 2)
+        return draw_line_segment(page, page_height, start, end, item_style)
+    if shape_kind in {"polyline", "path", "arc"}:
+        points = primitive_points(node, item.get("points"))
+        if len(points) < 2:
+            return None
+        curve_mode = str(item.get("curve_mode", item.get("curve", "polyline"))).lower()
+        return draw_single_path(page, page_height, points, item_style, curve_mode)
+    if shape_kind in {"text", "label"}:
+        box = primitive_local_box(node, item)
+        return draw_text_box(page, page_height, box["x"], box["y"], box["w"], box["h"], str(item.get("text", "")), item_style)
+    if shape_kind in {"plus", "cross_plus"}:
+        box = primitive_local_box(node, item)
+        horizontal = draw_line_segment(page, page_height, (box["x"], box["y"] + box["h"] / 2), (box["x"] + box["w"], box["y"] + box["h"] / 2), item_style)
+        draw_line_segment(page, page_height, (box["x"] + box["w"] / 2, box["y"]), (box["x"] + box["w"] / 2, box["y"] + box["h"]), item_style)
+        return horizontal
+    if shape_kind in {"x", "cross", "times"}:
+        box = primitive_local_box(node, item)
+        first = draw_line_segment(page, page_height, (box["x"], box["y"]), (box["x"] + box["w"], box["y"] + box["h"]), item_style)
+        draw_line_segment(page, page_height, (box["x"] + box["w"], box["y"]), (box["x"], box["y"] + box["h"]), item_style)
+        return first
+    return None
+
+
+def symbol_kind_subshapes(kind: str) -> list[dict[str, Any]]:
+    if kind in {"circle_plus", "plus_circle", "add_circle"}:
+        return [
+            {"shape": "circle", "bbox": [0.05, 0.05, 0.90, 0.90], "fill": "none"},
+            {"shape": "plus", "bbox": [0.30, 0.30, 0.40, 0.40]},
+        ]
+    if kind in {"triangle_gate", "triangle_in_circle"}:
+        return [
+            {"shape": "circle", "bbox": [0.04, 0.04, 0.92, 0.92], "fill": "none"},
+            {"shape": "triangle", "points": [[0.38, 0.28], [0.72, 0.50], [0.38, 0.72]], "fill": "none"},
+        ]
+    if kind in {"x_circle", "cross_circle"}:
+        return [
+            {"shape": "circle", "bbox": [0.05, 0.05, 0.90, 0.90], "fill": "none"},
+            {"shape": "x", "bbox": [0.32, 0.32, 0.36, 0.36]},
+        ]
+    if kind in {"refresh_arrow", "loop_arrow"}:
+        return [
+            {
+                "shape": "polyline",
+                "points": [[0.72, 0.26], [0.86, 0.42], [0.80, 0.63], [0.58, 0.78], [0.34, 0.70], [0.22, 0.50], [0.30, 0.30], [0.52, 0.22]],
+                "curve_mode": "smooth",
+                "end_arrow": "triangle",
+                "fill": "none",
+            }
+        ]
+    return []
+
+
+def draw_primitive_group(page: Any, page_height: float, node: dict[str, Any], style: dict[str, Any]) -> Any:
+    subshapes = node.get("subshapes", node.get("parts", node.get("primitives", [])))
+    if not isinstance(subshapes, list) or not subshapes:
+        subshapes = [{"shape": node.get("shape", "rect"), "bbox": [0, 0, 1, 1], "fill": style.get("fill", "none")}]
+    first_shape = None
+    for raw_item in subshapes:
+        if not isinstance(raw_item, dict):
+            continue
+        shape = draw_primitive_subshape(page, page_height, node, raw_item, style)
+        first_shape = shape if first_shape is None and shape is not None else first_shape
+    if first_shape is None:
+        first_shape = draw_rectangle(page, page_height, node)
+        apply_style(first_shape, merge_style(style, {"fill": "none", "line": "none"}))
+    return first_shape
+
+
+def draw_symbol_group(page: Any, page_height: float, node: dict[str, Any], style: dict[str, Any]) -> Any:
+    if isinstance(node.get("subshapes"), list) and node.get("subshapes"):
+        return draw_primitive_group(page, page_height, node, style)
+    kind = str(node.get("symbol_kind", node.get("motif", node.get("shape", "")))).lower()
+    symbol_node = dict(node)
+    symbol_node["subshapes"] = symbol_kind_subshapes(kind)
+    if not symbol_node["subshapes"]:
+        symbol_node["subshapes"] = [{"shape": "text", "bbox": [0, 0, 1, 1], "text": node.get("symbol", node.get("text", ""))}]
+    return draw_primitive_group(page, page_height, symbol_node, style)
+
+
 def classifier_blocks(node: dict[str, Any]) -> list[dict[str, Any]]:
     raw_blocks = node.get("blocks", node.get("labels", ["AvgPool", "Linear"]))
     if not isinstance(raw_blocks, list) or not raw_blocks:
@@ -5512,6 +5788,16 @@ def draw_node(
             shape = draw_caption_block(page, page_height, node, style)
         elif render_kind == "wave_signal":
             shape = draw_wave_signal(page, page_height, node, style)
+        elif render_kind == "cell_strip":
+            shape = draw_cell_strip(page, page_height, node, style)
+        elif render_kind == "micro_grid":
+            shape = draw_micro_grid(page, page_height, node, style)
+        elif render_kind == "polyline_wave":
+            shape = draw_polyline_wave(page, page_height, node, style)
+        elif render_kind == "primitive_group":
+            shape = draw_primitive_group(page, page_height, node, style)
+        elif render_kind == "symbol_group":
+            shape = draw_symbol_group(page, page_height, node, style)
         elif render_kind == "classifier_head":
             shape = draw_classifier_head(page, page_height, node, style)
         elif render_kind == "layer_sequence":
@@ -5527,6 +5813,11 @@ def draw_node(
         "brace_merge",
         "concat_operator",
         "wave_signal",
+        "cell_strip",
+        "micro_grid",
+        "polyline_wave",
+        "primitive_group",
+        "symbol_group",
         "classifier_head",
         "layer_sequence",
         "boundary_fanout",
@@ -5554,6 +5845,11 @@ def draw_node(
         "feature_map_grid",
         "merge_bus",
         "wave_signal",
+        "cell_strip",
+        "micro_grid",
+        "polyline_wave",
+        "primitive_group",
+        "symbol_group",
         "classifier_head",
         "layer_sequence",
         "boundary_fanout",

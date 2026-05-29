@@ -18,8 +18,10 @@ from scene_to_visio import (
 )
 from scene_validate import (
     CONTAINER_TYPES,
+    INTERNAL_EDGE_ROLES,
     STRICT_REPLICA_REVIEW_MODES,
     STRICT_REQUIRED_REGION_CATEGORIES,
+    VISUAL_GRAMMAR_NODE_TYPES,
     arrow_plan_items,
     base_node_id,
     bbox_signature,
@@ -45,6 +47,7 @@ from scene_validate import (
     point_in_box,
     polyline_intersects_box_bbox,
     region_categories,
+    recursive_fact_text,
     scene_looks_like_gan_tfr,
     segment_has_diagonal,
     segment_intersects_box_interior,
@@ -546,6 +549,8 @@ def audit_scene(scene: dict[str, Any]) -> str:
     rebuild_items: list[str] = []
     audit_items: list[str] = []
     typography_items: list[str] = []
+    visual_grammar_items: list[str] = []
+    decorative_internal_items: list[str] = []
     resolved_font_counts: dict[str, int] = {}
     gan_tfr_context = scene_looks_like_gan_tfr(scene, nodes_by_id)
     metadata = scene.get("metadata", {}) if isinstance(scene.get("metadata"), dict) else {}
@@ -583,6 +588,41 @@ def audit_scene(scene: dict[str, Any]) -> str:
             except Exception as exc:
                 typography_items.append(f"- [ ] Font style for `{node.get('id')}` could not be resolved: {exc}")
         node_type = node.get("type")
+        if node_type in VISUAL_GRAMMAR_NODE_TYPES:
+            node_id = str(node.get("id"))
+            if exact_mode and not node.get("source_bbox_px", node.get("source_bbox")):
+                visual_grammar_items.append(
+                    f"- [ ] `{node_id}` is `{node_type}` without source_bbox_px; bind it to the crop so review can judge the preserved visual facts."
+                )
+            if exact_mode and not node.get("must_match_facts"):
+                visual_grammar_items.append(
+                    f"- [ ] `{node_id}` is `{node_type}` without must_match_facts; list the source facts this primitive must retain."
+                )
+            fact_text = recursive_fact_text(
+                {
+                    "visual_facts": node.get("visual_facts"),
+                    "source_visual_facts": node.get("source_visual_facts"),
+                    "must_match_facts": node.get("must_match_facts"),
+                }
+            )
+            if node_type in {"cell_strip", "micro_grid"}:
+                rounding = node.get("cell_rounding_in", node.get("rounding_in", (node.get("style", {}) if isinstance(node.get("style"), dict) else {}).get("cell_rounding_in")))
+                if ("low_rounding" in fact_text or "rectangular" in fact_text) and isinstance(rounding, (int, float)) and float(rounding) > 0.06:
+                    visual_grammar_items.append(
+                        f"- [ ] [REBUILD] `{node_id}` records rectangular/low-rounding cells but uses rounding {float(rounding):.2f} in; use `cell_strip`/`micro_grid` with near-zero rounding."
+                    )
+                if not any(node.get(key) for key in ("cell_count", "count", "cells_count", "rows", "cols", "columns")):
+                    visual_grammar_items.append(f"- [ ] `{node_id}` is `{node_type}` without explicit cell count/rows/cols.")
+            if node_type == "polyline_wave" and not (node.get("points") or node.get("samples")):
+                visual_grammar_items.append(
+                    f"- [ ] [REBUILD] `{node_id}` is `polyline_wave` without points/samples; source-specific waves must not fall back to a generic curve."
+                )
+            if node_type == "symbol_group":
+                subshapes = node.get("subshapes", node.get("parts", node.get("primitives")))
+                if exact_mode and not subshapes and not node.get("symbol_kind"):
+                    visual_grammar_items.append(
+                        f"- [ ] `{node_id}` is `symbol_group` without subshapes or symbol_kind; encode the visible circle/triangle/line parts explicitly."
+                    )
         if node_type == "ellipse_node" and str(node.get("text", "")).strip() in {"+", "x", "×", "⊗", "*"}:
             audit_items.append(f"- [ ] `{node.get('id')}` looks like an operator but uses `ellipse_node`; use `operator_node`.")
         if node_type == "operator_node":
@@ -1010,6 +1050,12 @@ def audit_scene(scene: dict[str, Any]) -> str:
 
     for edge in edges:
         edge_id = str(edge.get("id", "<missing-id>"))
+        edge_role = str(edge.get("edge_role", edge.get("semantic_role", ""))).lower()
+        if edge_role in INTERNAL_EDGE_ROLES:
+            decorative_internal_items.append(
+                f"- [ ] `{edge_id}` is `{edge_role}`; review it as symbol/icon geometry, not as a main topology arrow."
+            )
+            continue
         source_id, target_id, source_container, target_container = edge_container_cache.get(edge_id, (None, None, None, None))
         source_type = node_types_by_id.get(source_id or "")
         target_type = node_types_by_id.get(target_id or "")
@@ -1303,6 +1349,20 @@ def audit_scene(scene: dict[str, Any]) -> str:
         lines.append("- [ ] Compare this module against the source crop: frame bounds, child count, labels, colors, and arrow directions.")
         lines.append("- [ ] Check every outgoing edge: does it originate from a component, a boundary, or a bus in the source?")
         lines.append("")
+
+    lines.append("## Visual Grammar Audit Items")
+    if visual_grammar_items:
+        lines.extend(visual_grammar_items)
+    else:
+        lines.append("- No visual-grammar primitive issues found. Still compare source facts such as cell count, low rounding, wave samples, and symbol internals visually.")
+    lines.append("")
+
+    lines.append("## Decorative/Internal Audit Items")
+    if decorative_internal_items:
+        lines.extend(decorative_internal_items)
+    else:
+        lines.append("- No decorative/internal edge roles found.")
+    lines.append("")
 
     lines.append("## Topology Review Items")
     if rebuild_items:

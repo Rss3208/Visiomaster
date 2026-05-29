@@ -30,6 +30,104 @@
         "line_dash": "solid"
       }
     },
+    "primitive_group": {
+      "renderer": "primitive_group",
+      "default_style": {
+        "fill": "none",
+        "line": "#111827",
+        "line_weight_pt": 0.9,
+        "line_dash": "solid",
+        "text_color": "#111827",
+        "font_family": "Times New Roman",
+        "font_family_candidates": ["Times New Roman", "Cambria Math", "Cambria", "Arial"],
+        "font_role": "paper_serif",
+        "font_size_pt": 10,
+        "text_margin_in": 0.01,
+        "rounding_in": 0.0
+      }
+    },
+    "shape_cluster": {
+      "renderer": "primitive_group",
+      "default_style": {
+        "fill": "none",
+        "line": "#111827",
+        "line_weight_pt": 0.8,
+        "line_dash": "solid",
+        "text_color": "#111827",
+        "font_family": "Arial",
+        "font_family_candidates": ["Arial", "Calibri", "Times New Roman"],
+        "font_role": "paper_sans",
+        "font_size_pt": 9,
+        "text_margin_in": 0.01,
+        "rounding_in": 0.0
+      }
+    },
+    "symbol_group": {
+      "renderer": "symbol_group",
+      "default_style": {
+        "fill": "none",
+        "line": "#111827",
+        "line_weight_pt": 0.85,
+        "line_dash": "solid",
+        "text_color": "#111827",
+        "font_family": "Cambria Math",
+        "font_family_candidates": ["Cambria Math", "Times New Roman", "Arial"],
+        "font_role": "math",
+        "font_size_pt": 10,
+        "text_margin_in": 0.0,
+        "rounding_in": 0.0
+      }
+    },
+    "cell_strip": {
+      "renderer": "cell_strip",
+      "default_style": {
+        "fill": "#FFFFFF",
+        "line": "#111827",
+        "line_weight_pt": 0.65,
+        "line_dash": "solid",
+        "cell_fill": "#FFFFFF",
+        "cell_line": "#111827",
+        "cell_line_weight_pt": 0.55,
+        "cell_gap_in": 0.0,
+        "cell_rounding_in": 0.0,
+        "font_family": "Times New Roman",
+        "font_family_candidates": ["Times New Roman", "Cambria Math", "Cambria", "Arial"],
+        "font_role": "paper_serif",
+        "font_size_pt": 8,
+        "text_margin_in": 0.0
+      }
+    },
+    "micro_grid": {
+      "renderer": "micro_grid",
+      "default_style": {
+        "fill": "#FFFFFF",
+        "line": "#111827",
+        "line_weight_pt": 0.55,
+        "line_dash": "solid",
+        "cell_fill": "#FFFFFF",
+        "cell_line": "#111827",
+        "cell_line_weight_pt": 0.45,
+        "cell_gap_in": 0.0,
+        "cell_rounding_in": 0.0,
+        "font_family": "Times New Roman",
+        "font_family_candidates": ["Times New Roman", "Cambria Math", "Arial"],
+        "font_role": "paper_serif",
+        "font_size_pt": 7,
+        "text_margin_in": 0.0
+      }
+    },
+    "polyline_wave": {
+      "renderer": "polyline_wave",
+      "default_style": {
+        "fill": "none",
+        "line": "#111827",
+        "line_weight_pt": 0.8,
+        "line_dash": "solid",
+        "end_arrow": "none",
+        "font_family": "Times New Roman",
+        "font_size_pt": 1
+      }
+    },
     "rounded_process": {
       "renderer": "rounded_rectangle",
       "default_style": {

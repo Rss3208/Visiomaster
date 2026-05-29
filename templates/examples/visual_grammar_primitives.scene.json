@@ -1,0 +1,208 @@
+{
+  "version": "0.1",
+  "metadata": {
+    "title": "Visual grammar primitives example",
+    "style_profile": "paper_white",
+    "fidelity": "exact",
+    "replica_review_mode": "strict_replica",
+    "replica_stage": "layout_topology",
+    "source_aspect_ratio": 1.6,
+    "visual_grammar_inventory": {
+      "shape_facts": ["small outlined triangle inside circle", "thin rectangular frame"],
+      "cell_facts": ["continuous rectangular cells", "5 columns", "low_rounding", "thin grid line"],
+      "line_facts": ["decorative internal line is not a flow arrow", "thin solid local strokes"],
+      "symbol_facts": ["triangle gate", "circle plus"],
+      "wave_facts": ["polyline-like", "single peak", "source samples control silhouette"],
+      "text_facts": ["single-line math labels", "small centered cell labels"]
+    },
+    "source_visual_inventory": {
+      "analysis_basis": "visual_llm_source_image",
+      "language_profile": "English paper labels",
+      "do_not_translate": true,
+      "unknown_text_policy": "mark_unreadable_do_not_invent",
+      "scene_authoring_mode": "fresh_from_source_inventory",
+      "prior_scene_policy": "do_not_read_or_patch_prior_round_scene",
+      "regions": [
+        {
+          "id": "global_overview",
+          "crop_type": "global",
+          "source_bbox_px": [0, 0, 800, 500],
+          "required_labels": ["x", "gate"],
+          "required_component_motifs": ["cell strip", "micro grid", "polyline wave", "triangle gate"],
+          "box_style_facts": ["white page", "thin outlines"],
+          "line_style_facts": ["thin solid strokes"],
+          "density_facts": ["compact local visual grammar"]
+        },
+        {
+          "id": "input_cells",
+          "crop_type": "input",
+          "source_bbox_px": [60, 120, 330, 210],
+          "required_labels": ["x"],
+          "required_component_motifs": ["5 continuous rectangular cells"],
+          "box_style_facts": ["cells have low_rounding"],
+          "line_style_facts": ["thin grid lines"],
+          "density_facts": ["tight horizontal strip"]
+        },
+        {
+          "id": "core_symbols",
+          "crop_type": "core",
+          "source_bbox_px": [330, 110, 520, 255],
+          "required_labels": ["gate"],
+          "required_component_motifs": ["triangle_in_circle symbol", "circle_plus symbol"],
+          "box_style_facts": ["outlined symbols"],
+          "line_style_facts": ["decorative internal lines are not data-flow arrows"],
+          "density_facts": ["small icon cluster"]
+        },
+        {
+          "id": "output_wave",
+          "crop_type": "output",
+          "source_bbox_px": [520, 120, 760, 250],
+          "required_labels": ["wave"],
+          "required_component_motifs": ["source-sampled polyline waveform"],
+          "box_style_facts": ["no enclosing token box"],
+          "line_style_facts": ["wave is a polyline, not a smooth sine replacement"],
+          "density_facts": ["single local waveform"]
+        },
+        {
+          "id": "arrow_dense",
+          "crop_type": "arrow-dense",
+          "source_bbox_px": [320, 110, 540, 260],
+          "required_edge_motifs": ["symbol internal strokes only"],
+          "required_component_motifs": ["decorative internal line"],
+          "box_style_facts": ["symbols remain compact"],
+          "line_style_facts": ["internal line has edge_role symbol_internal"],
+          "density_facts": ["icon internals do not pollute topology"]
+        },
+        {
+          "id": "small_text",
+          "crop_type": "small-text",
+          "source_bbox_px": [60, 110, 760, 270],
+          "required_labels": ["x", "gate", "wave"],
+          "required_component_motifs": ["single-line labels"],
+          "box_style_facts": ["labels stay close to primitives"],
+          "line_style_facts": ["labels do not overlap strokes"],
+          "density_facts": ["small labels remain readable"]
+        }
+      ]
+    },
+    "region_plan": [
+      {"id": "global_overview", "crop_type": "global", "source_bbox_px": [0, 0, 800, 500], "target_bbox": [0, 0, 800, 500]},
+      {"id": "input_cells", "crop_type": "input", "source_bbox_px": [60, 120, 330, 210], "target_bbox": [60, 120, 330, 210]},
+      {"id": "core_symbols", "crop_type": "core", "source_bbox_px": [330, 110, 520, 255], "target_bbox": [330, 110, 520, 255]},
+      {"id": "output_wave", "crop_type": "output", "source_bbox_px": [520, 120, 760, 250], "target_bbox": [520, 120, 760, 250]},
+      {"id": "arrow_dense", "crop_type": "arrow-dense", "source_bbox_px": [320, 110, 540, 260], "target_bbox": [320, 110, 540, 260]},
+      {"id": "small_text", "crop_type": "small-text", "source_bbox_px": [60, 110, 760, 270], "target_bbox": [60, 110, 760, 270]}
+    ],
+    "arrow_plan": []
+  },
+  "page": {
+    "width": 800,
+    "height": 500,
+    "units": "px",
+    "origin": "top-left",
+    "target_width_in": 8,
+    "background": "#FFFFFF"
+  },
+  "assets": [],
+  "nodes": [
+    {"id": "page_background", "type": "page_background", "x": 0, "y": 0, "w": 800, "h": 500, "z": -100},
+    {
+      "id": "input_strip",
+      "type": "cell_strip",
+      "primitive_family": "cell_strip",
+      "source_bbox_px": [80, 145, 315, 185],
+      "source_visual_facts": {"primitive_family": "cell_strip", "cell_count": 5, "rounding": "low_rounding", "continuity": "continuous"},
+      "must_match_facts": ["5 rectangular cells", "low_rounding", "continuous thin grid line"],
+      "x": 90,
+      "y": 145,
+      "w": 225,
+      "h": 40,
+      "cell_count": 5,
+      "cell_gap_in": 0,
+      "cell_rounding_in": 0,
+      "labels": ["x1", "x2", "x3", "x4", "x5"],
+      "style": {"cell_line_weight_pt": 0.55, "font_size_pt": 8}
+    },
+    {
+      "id": "gate_symbol",
+      "type": "symbol_group",
+      "primitive_family": "symbol_group",
+      "motif_binding": "gate_symbol",
+      "source_bbox_px": [390, 130, 450, 190],
+      "source_visual_facts": {"primitive_family": "symbol_group", "shape": "triangle_in_circle", "line_weight": "thin"},
+      "must_match_facts": ["outlined circle", "right-facing triangle", "thin line"],
+      "symbol_kind": "triangle_in_circle",
+      "x": 390,
+      "y": 130,
+      "w": 60,
+      "h": 60
+    },
+    {
+      "id": "plus_symbol",
+      "type": "symbol_group",
+      "primitive_family": "symbol_group",
+      "source_bbox_px": [390, 205, 450, 265],
+      "source_visual_facts": {"primitive_family": "symbol_group", "shape": "circle_plus", "line_weight": "thin"},
+      "must_match_facts": ["outlined circle", "center plus", "thin line"],
+      "symbol_kind": "circle_plus",
+      "x": 390,
+      "y": 205,
+      "w": 60,
+      "h": 60
+    },
+    {
+      "id": "output_wave",
+      "type": "polyline_wave",
+      "primitive_family": "polyline_wave",
+      "source_bbox_px": [540, 145, 735, 205],
+      "source_visual_facts": {"primitive_family": "polyline_wave", "shape": "single_peak_polyline", "smoothness": "polyline-like"},
+      "must_match_facts": ["single peak", "polyline-like segments", "not generic sine"],
+      "x": 540,
+      "y": 145,
+      "w": 195,
+      "h": 60,
+      "samples": [-0.15, -0.10, 0.55, 0.20, -0.35, -0.18, 0.05],
+      "style": {"line_weight_pt": 0.9}
+    },
+    {
+      "id": "mini_grid",
+      "type": "micro_grid",
+      "primitive_family": "micro_grid",
+      "source_bbox_px": [560, 230, 680, 295],
+      "source_visual_facts": {"primitive_family": "micro_grid", "rows": 2, "cols": 4, "rounding": "low_rounding"},
+      "must_match_facts": ["2 rows", "4 columns", "rectangular cells"],
+      "x": 560,
+      "y": 230,
+      "w": 120,
+      "h": 60,
+      "rows": 2,
+      "cols": 4,
+      "cell_gap_in": 0,
+      "cell_rounding_in": 0,
+      "style": {"cell_line_weight_pt": 0.45}
+    },
+    {
+      "id": "gate_label",
+      "type": "text_block",
+      "x": 367,
+      "y": 96,
+      "w": 105,
+      "h": 28,
+      "text": "gate",
+      "source_bbox_px": [367, 96, 472, 124],
+      "text_role": "small_label",
+      "style": {"font_size_pt": 10, "text_fit": "single_line", "min_font_size_pt": 8, "line": "none", "fill": "none"}
+    }
+  ],
+  "edges": [
+    {
+      "id": "gate_internal_axis",
+      "type": "line_segment",
+      "edge_role": "symbol_internal",
+      "from_point": [420, 130],
+      "to_point": [420, 190],
+      "route": "vertical",
+      "style": {"line": "#111827", "line_weight_pt": 0.45, "end_arrow": "none"}
+    }
+  ]
+}

@@ -140,6 +140,25 @@ Rules for `source_visual_inventory`:
 - Use old scenes and old visual reviews only as failure evidence. A new capability evaluation scene should be authored fresh from this inventory.
 - A batch script may export multiple already-authored scenes, but a batch script that writes all scenes is not evidence that the skill can reconstruct new images from visual analysis.
 
+For exact replicas, also add `metadata.visual_grammar_inventory` before choosing components. This is a source-fact inventory for visual primitives, not a component decision.
+
+```json
+{
+  "metadata": {
+    "visual_grammar_inventory": {
+      "shape_facts": ["thin rounded rectangle", "outlined triangle"],
+      "cell_facts": ["continuous rectangular cells", "5 columns", "low rounding"],
+      "line_facts": ["solid horizontal", "dashed orthogonal", "arrowhead at end"],
+      "symbol_facts": ["circle plus", "triangle gate"],
+      "wave_facts": ["polyline-like", "single peak", "noisy high frequency"],
+      "text_facts": ["single-line math", "bold centered title"]
+    }
+  }
+}
+```
+
+The rule is: components are rendering grammar, not recognition conclusions. Use the inventory to parameterize `cell_strip`, `micro_grid`, `polyline_wave`, `symbol_group`, `shape_cluster`, `primitive_group`, or a higher-level component. If a component would change a source fact, for example turning rectangular cells into rounded tokens, choose a primitive instead.
+
 For exact replicas, add an arrow inventory before authoring edges. This is a source-image visual contract: it records which arrow connects what, whether it is straight/orthogonal/curved, where it lands, and whether it carries an arrowhead. Scene edges should reference these entries through `arrow_plan_id`.
 
 ```json
@@ -369,6 +388,39 @@ Recommended semantic fields:
 - `label_anchor`: preferred anchor such as `left`, `right`, `top`, `bottom`, `center`.
 - `layout_motif`: local layout grammar such as `centered_single_line_caption`, `vector_plus_label`, `vertical_bar_group`.
 - `topology_motif`: local connection grammar such as `branch_trunk`, `merge_trunk`, `paper_bus`.
+
+Recommended visual-grammar fields for small source-bound primitives:
+- `primitive_family`: one of `cell_strip`, `polyline_wave`, `symbol_group`, `shape_cluster`, `primitive_group`, `compact_grid`, `micro_grid`, or `text_formula`.
+- `motif_binding`: stable id linking this node to a source motif/fact such as `m2_gate_symbol`.
+- `visual_facts` / `source_visual_facts`: object or array describing what the source unit visibly is, such as `primitive_family: symbol_group`, `shape: triangle_in_circle`, `rounding: low`, `line_weight: thin`, or `fill_policy: source_matched`.
+- `must_match_facts`: source facts that visual review must check after rendering, for example `5 rectangular cells`, `single-peak polyline`, or `triangle remains inside circle`.
+- `subshape_role`: for primitive internals such as `symbol_internal`, `icon_internal`, or `decorative_detail`.
+- `source_bbox_px`: required for crop-sensitive small components in strict exact mode, not only for large modules.
+
+Example:
+
+```json
+{
+  "id": "m2_gate_symbol",
+  "type": "symbol_group",
+  "primitive_family": "symbol_group",
+  "motif_binding": "m2_gate_symbol",
+  "source_bbox_px": [420, 180, 462, 222],
+  "source_visual_facts": {
+    "primitive_family": "symbol_group",
+    "shape": "triangle_in_circle",
+    "rounding": "none",
+    "line_weight": "thin",
+    "fill_policy": "source_matched"
+  },
+  "must_match_facts": ["outlined circle", "right-facing triangle", "thin line"],
+  "symbol_kind": "triangle_in_circle",
+  "x": 3.1,
+  "y": 1.2,
+  "w": 0.24,
+  "h": 0.24
+}
+```
 
 ### Text Fitting
 
@@ -1598,6 +1650,7 @@ Optional edge fields:
 ```json
 {
   "arrow_plan_id": "A001",
+  "edge_role": "data_flow",
   "label": "Optional label",
   "allow_diagonal": false,
   "allow_cross_container": false,
@@ -1610,6 +1663,10 @@ Optional edge fields:
   "z": 100
 }
 ```
+
+`edge_role` separates topology edges from visual internals:
+- `data_flow`, `context_flow`, `feedback_flow`: source-visible connectors that should usually bind to `metadata.arrow_plan`.
+- `decorative_internal`, `symbol_internal`, `icon_internal`: lines inside icons, motifs, symbols, or graph-like decorative structures. These do not satisfy arrow-plan topology and should be reviewed by visual grammar checks instead.
 
 Endpoint syntax currently supports:
 - `node-id`

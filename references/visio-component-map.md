@@ -11,6 +11,12 @@ It uses a controlled semantic vocabulary so the analysis side stays stable while
 | Type | Meaning | V1 renderer |
 | --- | --- | --- |
 | `page_background` | bottom export helper preserving canvas ratio | white rectangle ignored by semantic audits |
+| `primitive_group` | editable group of basic rect/circle/line/text subshapes | subshape primitives in one local bbox |
+| `shape_cluster` | icon-like or local structural cluster without business semantics | subshape primitives in one local bbox |
+| `symbol_group` | small composed symbol such as circle-plus, triangle gate, cross, refresh mark | editable circle/line/triangle/text subshapes |
+| `cell_strip` | repeated rectangular cells in a row/column | editable low-rounding cells with explicit count/gap |
+| `micro_grid` | small matrix/tensor tile that should not become rounded tokens | editable rectangular cells and thin grid lines |
+| `polyline_wave` | source-specific waveform/polyline silhouette | explicit samples/points, no generic sine in strict replicas |
 | `process_box` | standard process/module block | rectangle |
 | `rounded_process` | softer process block | rounded rectangle |
 | `stacked_process` | repeated offset feature/map block shown as one semantic node | repeated editable rounded rectangles |
@@ -71,6 +77,18 @@ This is deliberate:
 - early overfitting to master names will make the system fragile
 - most flowchart reconstruction work only needs a limited component family
 
+## Component Selection Decision Tree
+
+Components are rendering grammar, not recognition conclusions. Source visual facts decide component parameters.
+
+Use this order:
+
+1. Inventory the source visual facts first: shape family, cell count/gap/rounding, line style, symbol internals, wave samples, text role.
+2. If the unit is just repeated rectangles/circles/lines/polylines, use a primitive (`cell_strip`, `micro_grid`, `polyline_wave`, `symbol_group`, `shape_cluster`, or `primitive_group`) instead of inventing a business component.
+3. Use a higher-level component only when its parameters can preserve the recorded facts.
+4. If a component would change the facts, such as rectangular cells becoming rounded tokens, a noisy source wave becoming a sine wave, or icon-internal lines becoming flow arrows, fail that component choice and switch to a primitive.
+5. Mark icon/symbol internals with `subshape_role` or `edge_role: "symbol_internal"` / `"icon_internal"` / `"decorative_internal"` so topology audit does not treat them as main flow connectors.
+
 ## Future Upgrade Path
 
 The current renderer strategy is:
@@ -109,6 +127,14 @@ python scripts/font_inventory.py --check "Times New Roman" --check "Calibri" --c
 ```
 
 For exact replicas, prefer explicit `points` and `route` fields over manually nudging node boxes until arrows look right.
+
+Use `cell_strip` when the source has a row/column of rectangular cells. Set `cell_count` or `rows`/`cols`, `cell_gap_in`, `cell_rounding_in`, and `must_match_facts`. Low-rounding source cells should use `cell_rounding_in` near zero; do not reuse token-grid defaults.
+
+Use `micro_grid` when the source has a compact matrix/tensor tile with thin rectangular cells. Use `grid_matrix` for larger semantic matrices; use `micro_grid` for local icon-scale or tensor-scale grids where exact cell grammar matters.
+
+Use `polyline_wave` for source-specific waveforms and signal silhouettes. Provide explicit `points` or `samples`; do not use a generic sine fallback in exact replica scenes.
+
+Use `symbol_group`, `shape_cluster`, or `primitive_group` for composed symbols and small local structures. Provide `subshapes` when the built-in `symbol_kind` is not enough. Subshape `bbox` values are local `[x, y, w, h]` values relative to the parent bbox when between 0 and 1.
 
 For merge/fan connectors, do not draw several arrows directly into the same box edge when the source has a visible shared trunk. Add a `junction_point` at the merge/fan position, route source arrows into that point without arrowheads, then route one final arrow to the destination.
 

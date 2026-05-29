@@ -97,6 +97,23 @@ Record the inventory in `metadata.source_visual_inventory` before the first rend
 - `unknown_text_policy`: use `mark_unreadable_do_not_invent` for unclear tiny text.
 - per-region `source_bbox_px`, required visible labels/formulas, component motifs, edge motifs, port/boundary/dashed-frame notes, uncertainty notes, and text layout facts.
 
+Before choosing components, add a mandatory `metadata.visual_grammar_inventory` pass. Components are rendering grammar, not recognition conclusions. The source visual facts decide the component parameters; components must not normalize source-specific variation into a standard template.
+
+Record facts such as:
+
+```json
+"visual_grammar_inventory": {
+  "shape_facts": ["thin rounded rectangle", "small filled circle", "outlined triangle"],
+  "cell_facts": ["continuous rectangular cells", "5 columns", "low rounding", "thin grid line"],
+  "line_facts": ["solid horizontal", "dashed orthogonal", "arrowhead at end"],
+  "symbol_facts": ["circle plus", "triangle gate", "circular refresh arrow"],
+  "wave_facts": ["polyline-like", "single peak", "noisy high frequency"],
+  "text_facts": ["single-line math", "bold centered title", "small multiline label"]
+}
+```
+
+Use this inventory to decide whether a source unit should become `cell_strip`, `micro_grid`, `polyline_wave`, `symbol_group`, `shape_cluster`, `primitive_group`, or a higher-level semantic component. If a higher-level component would change the recorded facts, for example rectangular cells becoming rounded tokens or a sampled waveform becoming a smooth sine, switch to a primitive instead.
+
 Before authoring the first `edges` array for an exact replica, run a separate arrow-inventory pass from the source image. The goal is to lock topology before any Visio PNG exists. For arrow-dense local structures, this pass is not optional bookkeeping; it is the scene driver:
 - record every source-visible arrow in `metadata.arrow_plan`
 - each visible arrow or visible line segment gets its own independent `arrow_plan_id`; do not describe a whole local subgraph or multi-hop chain with one plan entry
@@ -592,6 +609,10 @@ Why this matters:
 75. If a dashed feedback path looks like a tiny isolated arrow fragment, treat that as a semantic-route failure, not a cosmetic issue. Rebuild it as one `dashed_feedback_path` or a bus/port route instead of preserving the fragment.
 76. Before writing edges for exact replicas, produce `metadata.arrow_plan` from source-image visual inspection. Then bind each source-visible edge with `arrow_plan_id`; run `scene_validate.py --strict` before rendering so missing arrows, diagonal drift, wrong boundary endpoints, fragmented feedback paths, and broken loop arrows fail early.
 76a. Do a typography pass for exact replicas. Identify whether the source uses serif, sans, math, mono, CJK, or mixed typography before finalizing nodes; do not let every text node inherit a generic default by accident.
+76b. Do a `visual_grammar_inventory` pass before component selection. First write source facts for shapes, cells, lines, symbols, waves, and text; only then choose renderer components.
+76c. For repeated small rectangular cells, use `cell_strip` or `micro_grid` with explicit `cell_count`/`rows`/`cols`, `cell_gap_in`, and `cell_rounding_in`. Do not use rounded token/grid defaults when the source facts say rectangular, continuous, or low rounding.
+76d. For waveform-like details whose local silhouette matters, use `polyline_wave` with explicit `points` or `samples`. Do not let exact replicas fall back to a generic sine wave.
+76e. For small icon-like structures made from circles, triangles, plus/cross marks, arcs, or local decorative lines, use `symbol_group`, `shape_cluster`, or `primitive_group` with `subshapes`. Mark internal lines with `subshape_role`/`edge_role` such as `symbol_internal`, `icon_internal`, or `decorative_internal` so topology audit does not mistake icon geometry for main flow.
 77. Use `font_family_candidates` and `font_role` instead of a single fragile font name when exact family matching is uncertain. The renderer resolves to the first installed close match.
 78. If the source font is known, set `source_font_family` as well as `font_family`/`font_family_candidates`. This lets audit catch the case where the font exists locally but the scene still renders with the wrong family.
 79. Run `scripts/font_inventory.py` when a figure appears to use Calibri/Aptos/Arial/Times/Cambria/Chinese fonts. A missing source font should lead to a candidate list; an installed source font should be used directly.

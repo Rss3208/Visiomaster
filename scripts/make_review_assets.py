@@ -257,6 +257,67 @@ def arrow_plan_topology_checklist(scene: dict[str, object] | None) -> list[dict[
     return items
 
 
+def visual_grammar_checklist(scene: dict[str, object] | None) -> list[dict[str, object]]:
+    if not isinstance(scene, dict):
+        return []
+    metadata = scene.get("metadata", {}) if isinstance(scene.get("metadata"), dict) else {}
+    inventory = metadata.get("visual_grammar_inventory")
+    items: list[dict[str, object]] = []
+    counter = 1
+    if isinstance(inventory, dict):
+        for category in ("shape_facts", "cell_facts", "line_facts", "symbol_facts", "wave_facts", "text_facts"):
+            facts = inventory.get(category)
+            if not isinstance(facts, list):
+                continue
+            for fact in facts:
+                if not str(fact).strip():
+                    continue
+                items.append(
+                    {
+                        "id": f"V{counter:03d}",
+                        "kind": "visual_grammar",
+                        "category": category,
+                        "focus_region": "source_visual_grammar",
+                        "source_fact": str(fact),
+                        "source_expectation": str(fact),
+                        "replica_status": "not_reviewed",
+                        "repair_hint": "Preserve this source visual fact through component parameters, not by normalizing to a default template.",
+                        "status": "uncertain",
+                        "certainty": "certain",
+                    }
+                )
+                counter += 1
+    nodes = scene.get("nodes", []) if isinstance(scene.get("nodes"), list) else []
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        node_type = str(node.get("type", ""))
+        if node_type not in {"primitive_group", "shape_cluster", "symbol_group", "cell_strip", "micro_grid", "polyline_wave"}:
+            continue
+        facts = node.get("must_match_facts")
+        if not isinstance(facts, list) or not facts:
+            facts = [f"{node.get('id', '<node>')} should preserve its source visual facts"]
+        for fact in facts:
+            items.append(
+                {
+                    "id": f"V{counter:03d}",
+                    "kind": "primitive_node",
+                    "node_id": node.get("id"),
+                    "node_type": node_type,
+                    "focus_region": node.get("source_region_id", node.get("container_id", "local_primitive")),
+                    "source_bbox_px": node.get("source_bbox_px", node.get("source_bbox")),
+                    "source_fact": str(fact),
+                    "source_expectation": str(fact),
+                    "replica_status": "not_reviewed",
+                    "repair_hint": "If mismatched, change the primitive parameters or renderer capability before touching final-scene coordinates.",
+                    "status": "uncertain",
+                    "certainty": "certain",
+                }
+            )
+            counter += 1
+    return items
+
+
 def review_bundle_payload(
     *,
     figure_id: str,
@@ -279,6 +340,7 @@ def review_bundle_payload(
         for name, categories, source_box, target_box in regions
     ]
     topology_checklist = arrow_plan_topology_checklist(scene)
+    visual_checklist = visual_grammar_checklist(scene)
     manifest = {
         "schema_version": "0.1",
         "figure_id": figure_id,
@@ -294,6 +356,7 @@ def review_bundle_payload(
         "debug_overlay_paths": overlay_paths,
         "regions": region_rows,
         "arrow_plan_checklist": topology_checklist,
+        "visual_checklist": visual_checklist,
         "debug_asset_policy": {
             "global_pair": "off_by_default; generate only with --include-global-pair for human navigation or audit records",
             "crops": "targeted_only; generate named crops with --crops or scene regions with --region-crops all",
@@ -334,7 +397,7 @@ def review_bundle_payload(
         },
         "findings": [],
         "topology_checklist": topology_checklist,
-        "visual_checklist": [],
+        "visual_checklist": visual_checklist,
     }
     rebuild_template = {
         "schema_version": "0.1",
@@ -353,6 +416,7 @@ def review_bundle_payload(
         },
         "findings_digest": [],
         "arrow_plan_repair_targets": [],
+        "visual_grammar_repair_targets": [],
     }
     return manifest, findings_template, rebuild_template
 

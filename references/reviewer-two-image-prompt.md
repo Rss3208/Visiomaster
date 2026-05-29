@@ -86,7 +86,7 @@ Use this schema:
 The checklist fields are mandatory for exact-replica reviews:
 
 - `topology_checklist`: source-derived graph facts. Check branches, merges, shared trunks, operator order, arrow direction, arrow endpoints, boundary crossings, and required special components.
-- `visual_checklist`: source-derived layout/style facts. Check overlap, line-through-text, label wrapping, math text attachment, bracket/tensor spacing, feature-stack thickness, title placement, color, rounding, line weight, and shadow.
+- `visual_checklist`: source-derived layout/style/visual-grammar facts. Check overlap, line-through-text, label wrapping, cell count/gap/rounding, symbol internals, sampled wave shape, math text attachment, bracket/tensor spacing, feature-stack thickness, title placement, color, rounding, line weight, and shadow.
 - `status`: use `pass`, `fail`, or `uncertain`.
 - `certainty`: use `certain`, `inferred`, or `uncertain`.
 - Use `uncertain` instead of inventing details when a source crop is unclear.

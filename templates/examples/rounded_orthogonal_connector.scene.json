@@ -7,6 +7,14 @@
     "replica_review_mode": "strict_replica",
     "replica_stage": "layout_topology",
     "source_aspect_ratio": 1.6,
+    "visual_grammar_inventory": {
+      "shape_facts": ["light rounded process boxes", "white page background"],
+      "cell_facts": [],
+      "line_facts": ["solid rounded orthogonal connector", "straight horizontal and vertical lanes", "arrowhead only at final endpoint"],
+      "symbol_facts": [],
+      "wave_facts": [],
+      "text_facts": ["single-line centered labels"]
+    },
     "source_visual_inventory": {
       "analysis_basis": "visual_llm_source_image",
       "language_profile": "English paper-flow labels",

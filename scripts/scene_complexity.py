@@ -10,6 +10,7 @@ from typing import Any
 from scene_to_visio import load_component_map, load_style_profiles, normalize_scene_coordinates, resolve_profile
 from scene_validate import (
     CONTAINER_TYPES,
+    VISUAL_GRAMMAR_NODE_TYPES,
     exact_mode_from_metadata,
     estimate_text_box,
     has_valid_box,
@@ -46,6 +47,7 @@ def scene_complexity_report(scene: dict[str, Any], strict: bool = False) -> str:
     ]
     metadata = scene.get("metadata", {}) if isinstance(scene.get("metadata"), dict) else {}
     region_plan = metadata.get("region_plan", metadata.get("source_region_plan", metadata.get("source_regions")))
+    visual_grammar_inventory = metadata.get("visual_grammar_inventory")
     exact_mode = exact_mode_from_metadata(metadata)
 
     page = scene.get("page", {}) if isinstance(scene.get("page"), dict) else {}
@@ -88,6 +90,18 @@ def scene_complexity_report(scene: dict[str, Any], strict: bool = False) -> str:
         for container_id, child_ids in children_by_container.items()
         if len(child_ids) > 18
     ]
+    visual_grammar_ids = [
+        node_id
+        for node_id in visible_ids
+        if str(node_types_by_id.get(node_id)) in VISUAL_GRAMMAR_NODE_TYPES
+    ]
+    primitive_regions = sorted(
+        {
+            str(containers_by_node.get(node_id))
+            for node_id in visual_grammar_ids
+            if containers_by_node.get(node_id)
+        }
+    )
     cross_region_edges = 0
     for edge in edges:
         source = edge.get("from")
@@ -110,6 +124,8 @@ def scene_complexity_report(scene: dict[str, Any], strict: bool = False) -> str:
     lines.append(f"- Region-covered visible nodes: {len(visible_ids) - len(uncovered)}/{len(visible_ids)}")
     lines.append(f"- Cross-region edges: {cross_region_edges}")
     lines.append(f"- Region plan entries: {len(region_plan) if isinstance(region_plan, list) else 0}")
+    lines.append(f"- Visual grammar primitive nodes: {len(visual_grammar_ids)}")
+    lines.append(f"- Visual grammar inventory: {'present' if isinstance(visual_grammar_inventory, dict) else 'missing'}")
     lines.append(f"- Validation warnings: {len(warnings)}")
     lines.append(f"- Validation errors: {len(errors)}")
     lines.append("")
@@ -136,8 +152,11 @@ def scene_complexity_report(scene: dict[str, Any], strict: bool = False) -> str:
         lines.append("- Use `region_first` or `tiled_subscenes`: rebuild each logical module/crop, validate it, then assemble the full-page scene.")
         lines.append("- Add invisible `audit_region` boxes for source areas that do not have visible dashed frames.")
         lines.append("- Freeze shared style tokens before assembly: body font, small label font, operator font, frame title font, and arrow weight.")
+        lines.append("- Dense regions must include `metadata.visual_grammar_inventory` plus local crop review before full-page polishing.")
     else:
         lines.append("- Whole-scene authoring is acceptable, but still run module audit before final Visio render.")
+    if visual_grammar_ids and not isinstance(visual_grammar_inventory, dict):
+        lines.append("- Add `metadata.visual_grammar_inventory`; primitive nodes without source facts are hard to review consistently.")
     lines.append("")
 
     lines.append("## Region Load")
@@ -187,12 +206,26 @@ def scene_complexity_report(scene: dict[str, Any], strict: bool = False) -> str:
     if dense_regions:
         for container_id, child_ids in dense_regions:
             lines.append(f"- `{container_id}` has {len(child_ids)} visible nodes; split this region or create a local subscene.")
+        if not isinstance(visual_grammar_inventory, dict):
+            lines.append("- Dense-region gate: add `metadata.visual_grammar_inventory`; otherwise small cells, symbols, and waves can drift without a source-fact contract.")
+        lines.append("- Dense-region gate: generate local crop review assets for each dense/primitive-bearing region before accepting the full-page render.")
     else:
         lines.append("- No region exceeds the default density threshold.")
     lines.append("")
 
     lines.append("## Paper Detail Grammar Risks")
-    compact_types = {"grid_matrix", "token_grid", "feature_vector_stack", "math_vector", "math_text", "operator_node", "concat_operator", "brace_merge", "multi_port_junction"}
+    compact_types = {
+        "grid_matrix",
+        "token_grid",
+        "feature_vector_stack",
+        "math_vector",
+        "math_text",
+        "operator_node",
+        "concat_operator",
+        "brace_merge",
+        "multi_port_junction",
+        *VISUAL_GRAMMAR_NODE_TYPES,
+    }
     compact_counts: dict[str, int] = defaultdict(int)
     for node_id in visible_ids:
         node_type = str(node_types_by_id.get(node_id))
@@ -201,6 +234,14 @@ def scene_complexity_report(scene: dict[str, Any], strict: bool = False) -> str:
     if compact_counts:
         for node_type, count in sorted(compact_counts.items()):
             lines.append(f"- `{node_type}`: {count}")
+        if visual_grammar_ids:
+            preview = ", ".join(f"`{node_id}`" for node_id in visual_grammar_ids[:12])
+            suffix = " ..." if len(visual_grammar_ids) > 12 else ""
+            lines.append(f"- Visual grammar nodes requiring local visual checks: {preview}{suffix}")
+            if primitive_regions:
+                lines.append(f"- Primitive-bearing regions: {', '.join(f'`{region}`' for region in primitive_regions)}")
+            if not isinstance(visual_grammar_inventory, dict):
+                lines.append("- MISSING: `metadata.visual_grammar_inventory` should record shape/cell/line/symbol/wave/text facts before choosing these primitives.")
     else:
         lines.append("- No compact paper-detail primitives found; if the source has matrices, small operators, ports, or formulas, scene grammar is likely too coarse.")
     long_edges = []

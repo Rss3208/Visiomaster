@@ -28,6 +28,27 @@ ASPECT_RATIO_TOLERANCE = 0.08
 CONTAINER_TYPES = {"group_container", "dashed_region", "loss_region", "audit_region"}
 CURVED_EDGE_TYPES = {"curved_arrow", "loop_arrow"}
 CONTINUOUS_PATH_EDGE_TYPES = {"curved_arrow", "loop_arrow", "dashed_feedback_path"}
+VISUAL_GRAMMAR_NODE_TYPES = {"primitive_group", "shape_cluster", "symbol_group", "cell_strip", "micro_grid", "polyline_wave"}
+PRIMITIVE_FAMILIES = {
+    "cell_strip",
+    "polyline_wave",
+    "symbol_group",
+    "shape_cluster",
+    "primitive_group",
+    "compact_grid",
+    "micro_grid",
+    "text_formula",
+}
+VISUAL_GRAMMAR_INVENTORY_KEYS = (
+    "shape_facts",
+    "cell_facts",
+    "line_facts",
+    "symbol_facts",
+    "wave_facts",
+    "text_facts",
+)
+EDGE_ROLES = {"data_flow", "context_flow", "feedback_flow", "decorative_internal", "symbol_internal", "icon_internal"}
+INTERNAL_EDGE_ROLES = {"decorative_internal", "symbol_internal", "icon_internal"}
 LAYER_SEQUENCE_HORIZONTAL_ORIENTATIONS = {"horizontal", "h", "horizontal_bars", "bars", "side_by_side"}
 LAYER_SEQUENCE_VERTICAL_ORIENTATIONS = {"vertical", "v", "vertical_stack", "stack", "rows", "row_stack"}
 LAYER_SEQUENCE_ORIENTATIONS = LAYER_SEQUENCE_HORIZONTAL_ORIENTATIONS | LAYER_SEQUENCE_VERTICAL_ORIENTATIONS
@@ -127,6 +148,22 @@ def exact_mode_from_metadata(metadata: Any) -> bool:
     fidelity = str(metadata.get("fidelity", metadata.get("reconstruction_mode", ""))).lower()
     review_mode = str(metadata.get("replica_review_mode", metadata.get("review_mode", ""))).lower()
     return fidelity in EXACT_FIDELITY_MODES or review_mode in STRICT_REPLICA_REVIEW_MODES
+
+
+def recursive_fact_text(value: Any) -> str:
+    if isinstance(value, dict):
+        return " ".join(recursive_fact_text(item) for item in value.values())
+    if isinstance(value, list):
+        return " ".join(recursive_fact_text(item) for item in value)
+    return str(value).lower()
+
+
+def edge_visual_role(edge: dict[str, Any]) -> str:
+    return str(edge.get("edge_role", edge.get("semantic_role", ""))).lower()
+
+
+def is_internal_edge(edge: dict[str, Any]) -> bool:
+    return edge_visual_role(edge) in INTERNAL_EDGE_ROLES
 
 
 def region_label_text(region: dict[str, Any], *, include_required_crop_types: bool = False) -> str:
@@ -740,17 +777,17 @@ def text_fit_warnings(node: dict, style: dict[str, Any], exact_mode: bool = Fals
     return warnings
 
 
-def strict_text_shrink_warnings(node: dict[str, Any], style: dict[str, Any], exact_mode: bool) -> list[str]:
+def strict_text_shrink_findings(node: dict[str, Any], style: dict[str, Any], exact_mode: bool, strict_contract: bool = False) -> tuple[list[str], list[str]]:
     if not exact_mode or not all(isinstance(node.get(key), (int, float)) for key in ("w", "h")):
-        return []
+        return [], []
 
     text = node_text_for_font(node).strip()
     if not text:
-        return []
+        return [], []
 
     fit_mode = explicit_text_fit_mode(style)
     if fit_mode not in (TEXT_FIT_WIDTH_MODES | TEXT_FIT_HEIGHT_MODES):
-        return []
+        return [], []
 
     try:
         font_size = float(style.get("font_size_pt", 12) or 12)
@@ -760,7 +797,7 @@ def strict_text_shrink_warnings(node: dict[str, Any], style: dict[str, Any], exa
         width_safety = float(style.get("text_width_safety_factor", style.get("single_line_width_safety_factor", 1.10)) or 1.0)
         cjk_safety = float(style.get("cjk_text_width_safety_factor", 1.18) or 1.18)
     except (TypeError, ValueError):
-        return []
+        return [], []
 
     scale_ratio = approximate_text_scale_ratio(
         text,
@@ -774,23 +811,177 @@ def strict_text_shrink_warnings(node: dict[str, Any], style: dict[str, Any], exa
         cjk_width_safety=cjk_safety,
     )
     if scale_ratio is None:
-        return []
+        return [], []
 
     warnings: list[str] = []
+    errors: list[str] = []
     text_role = str(node.get("text_role", node.get("semantic_role", ""))).lower()
-    tight_threshold = 0.78 if text_role in STRICT_TEXT_ROLE_TYPES or node.get("type") in (RUN_TEXT_NODE_TYPES | {"math_text", "formula_text_block"}) else 0.68
+    tight_threshold = 0.75
+    if text_role in STRICT_TEXT_ROLE_TYPES or node.get("type") in (RUN_TEXT_NODE_TYPES | {"math_text", "formula_text_block"}):
+        tight_threshold = 0.78
     min_ratio = min(1.0, min_font / max(font_size, 1e-6))
+    if fit_mode in TEXT_FIT_SINGLE_LINE_MODES and scale_ratio < 0.60:
+        message = (
+            f"Exact text node `{node.get('id')}` would need roughly {scale_ratio:.0%} font scaling to stay on one line. "
+            "This is below the strict 60% floor; rebuild the text bbox/runs instead of hiding a font mismatch with compression."
+        )
+        (errors if strict_contract else warnings).append(message)
     if fit_mode in TEXT_FIT_SINGLE_LINE_MODES and scale_ratio < tight_threshold:
         warnings.append(
             f"Exact text node `{node.get('id')}` would need roughly {scale_ratio:.0%} font scaling to stay on one line. "
             "Widen the source-bound bbox, split into runs, or rebuild the local text layout instead of relying on heavy shrink."
         )
-    if fit_mode in TEXT_FIT_SINGLE_LINE_MODES and min_ratio < 0.58 and len(text.replace('\n', ' ').strip()) >= 4:
+    if fit_mode in TEXT_FIT_SINGLE_LINE_MODES and min_ratio < 0.60 and len(text.replace('\n', ' ').strip()) >= 4:
+        message = (
+            f"Exact text node `{node.get('id')}` allows shrink down to about {min_ratio:.0%} of its requested font size. "
+            "Strict replica text must not pass with a minimum font below 60%."
+        )
+        (errors if strict_contract else warnings).append(message)
+    elif fit_mode in TEXT_FIT_SINGLE_LINE_MODES and min_ratio < 0.75 and len(text.replace('\n', ' ').strip()) >= 4:
         warnings.append(
             f"Exact text node `{node.get('id')}` allows shrink down to about {min_ratio:.0%} of its requested font size. "
             "Single-line strict replica text should not pass only by aggressive font compression."
         )
-    return warnings
+    return warnings, errors
+
+
+def visual_grammar_node_findings(
+    node: dict[str, Any],
+    node_id: str,
+    node_type: str | None,
+    *,
+    exact_mode: bool,
+    strict_contract: bool,
+) -> tuple[list[str], list[str]]:
+    warnings: list[str] = []
+    errors: list[str] = []
+
+    def issue(message: str) -> None:
+        if strict_contract:
+            errors.append(message)
+        else:
+            warnings.append(message)
+
+    primitive_family = node.get("primitive_family")
+    if primitive_family is not None:
+        if not isinstance(primitive_family, str):
+            errors.append(f"Node `{node_id}` primitive_family must be a string.")
+        elif primitive_family not in PRIMITIVE_FAMILIES:
+            errors.append(f"Node `{node_id}` primitive_family `{primitive_family}` is unsupported.")
+
+    for key in ("visual_facts", "source_visual_facts"):
+        value = node.get(key)
+        if value is not None and not isinstance(value, (dict, list)):
+            errors.append(f"Node `{node_id}` {key} must be an object or array of source visual facts.")
+    for key in ("must_match_facts",):
+        value = node.get(key)
+        if value is not None and not isinstance(value, list):
+            errors.append(f"Node `{node_id}` {key} must be an array.")
+    if node.get("motif_binding") is not None and not isinstance(node.get("motif_binding"), str):
+        errors.append(f"Node `{node_id}` motif_binding must be a string.")
+    if node.get("subshape_role") is not None and not isinstance(node.get("subshape_role"), str):
+        errors.append(f"Node `{node_id}` subshape_role must be a string.")
+
+    if node_type not in VISUAL_GRAMMAR_NODE_TYPES:
+        return warnings, errors
+
+    if exact_mode:
+        if not node.get("source_bbox_px", node.get("source_bbox")):
+            issue(
+                f"Visual grammar node `{node_id}` (`{node_type}`) has no source_bbox_px/source_bbox; "
+                "crop-bound small components are required to judge cell count, wave shape, or symbol geometry."
+            )
+        if not isinstance(node.get("must_match_facts"), list) or not node.get("must_match_facts"):
+            issue(
+                f"Visual grammar node `{node_id}` (`{node_type}`) should list must_match_facts so review checks the source facts this primitive is preserving."
+            )
+
+    fact_text = recursive_fact_text(
+        {
+            "visual_facts": node.get("visual_facts"),
+            "source_visual_facts": node.get("source_visual_facts"),
+            "must_match_facts": node.get("must_match_facts"),
+        }
+    )
+
+    if node_type in {"cell_strip", "micro_grid"}:
+        rows = node.get("rows")
+        cols = node.get("cols", node.get("columns"))
+        count = node.get("cell_count", node.get("count", node.get("cells_count")))
+        if node_type == "micro_grid" or rows is not None:
+            if rows is not None and (not isinstance(rows, int) or rows <= 0):
+                errors.append(f"{node_type} `{node_id}` rows must be a positive integer.")
+            if cols is not None and (not isinstance(cols, int) or cols <= 0):
+                errors.append(f"{node_type} `{node_id}` cols/columns must be a positive integer.")
+        elif count is None:
+            issue(f"cell_strip `{node_id}` must declare cell_count/count/cells_count or explicit rows/cols.")
+        elif not isinstance(count, int) or count <= 0:
+            errors.append(f"cell_strip `{node_id}` cell_count/count/cells_count must be a positive integer.")
+        for key in ("cell_gap_in", "gap_in", "cell_rounding_in", "rounding_in"):
+            value = node.get(key)
+            if value is not None and (not isinstance(value, (int, float)) or float(value) < 0):
+                errors.append(f"{node_type} `{node_id}` {key} must be a non-negative number.")
+        if node.get("continuous") is not None and not isinstance(node.get("continuous"), bool):
+            warnings.append(f"{node_type} `{node_id}` continuous should be boolean.")
+        rounding = node.get("cell_rounding_in", node.get("rounding_in"))
+        if rounding is None and isinstance(node.get("style"), dict):
+            rounding = node["style"].get("cell_rounding_in", node["style"].get("rounding_in"))
+        if "low_rounding" in fact_text or "low rounding" in fact_text or "rectangular" in fact_text:
+            try:
+                if rounding is not None and float(rounding) > 0.06:
+                    issue(
+                        f"{node_type} `{node_id}` records low-rounding/rectangular source cells but uses cell_rounding_in={float(rounding):.3f}; "
+                        "use low or zero rounding instead of a token-like capsule default."
+                    )
+            except (TypeError, ValueError):
+                errors.append(f"{node_type} `{node_id}` rounding value must be numeric.")
+        cells = node.get("cells")
+        if cells is not None and not isinstance(cells, list):
+            errors.append(f"{node_type} `{node_id}` cells must be an array.")
+
+    if node_type == "polyline_wave":
+        points = node.get("points")
+        samples = node.get("samples")
+        has_points = isinstance(points, list) and len(points) >= 2
+        has_samples = isinstance(samples, list) and len(samples) >= 2 and all(isinstance(item, (int, float)) for item in samples)
+        if strict_contract and exact_mode and not (has_points or has_samples):
+            errors.append(
+                f"polyline_wave `{node_id}` is exact/strict but has no explicit points or samples; "
+                "do not fall back to a generic sine wave for source-specific waveforms."
+            )
+        if points is not None:
+            if not isinstance(points, list):
+                errors.append(f"polyline_wave `{node_id}` points must be an array.")
+            else:
+                for index, point in enumerate(points):
+                    if not isinstance(point, list) or len(point) != 2 or not all(isinstance(value, (int, float)) for value in point):
+                        errors.append(f"polyline_wave `{node_id}` points[{index}] must be [x, y] numbers.")
+        if samples is not None and not has_samples:
+            errors.append(f"polyline_wave `{node_id}` samples must contain at least two numeric values.")
+
+    if node_type in {"primitive_group", "shape_cluster", "symbol_group"}:
+        subshapes = node.get("subshapes", node.get("parts", node.get("primitives")))
+        symbol_kind = node.get("symbol_kind", node.get("motif"))
+        if subshapes is not None and not isinstance(subshapes, list):
+            errors.append(f"{node_type} `{node_id}` subshapes/parts/primitives must be an array.")
+        if exact_mode and node_type == "symbol_group" and not subshapes and not symbol_kind:
+            issue(f"symbol_group `{node_id}` needs subshapes or symbol_kind so the symbol geometry is explicit.")
+        if isinstance(subshapes, list):
+            for index, subshape in enumerate(subshapes):
+                if not isinstance(subshape, dict):
+                    errors.append(f"{node_type} `{node_id}` subshapes[{index}] must be an object.")
+                    continue
+                role = str(subshape.get("subshape_role", subshape.get("role", ""))).lower()
+                if exact_mode and role and role not in {"decorative_detail", "decorative_internal", "symbol_internal", "icon_internal", "primitive", "label"}:
+                    warnings.append(
+                        f"{node_type} `{node_id}` subshapes[{index}] role `{role}` is not a known internal/decorative role."
+                    )
+                if exact_mode and not role and str(subshape.get("shape", subshape.get("kind", ""))).lower() in {"line", "polyline", "path"}:
+                    warnings.append(
+                        f"{node_type} `{node_id}` subshape line/path {index} has no subshape_role; mark it symbol_internal/icon_internal so arrow audit does not treat it as a main connector."
+                    )
+
+    return warnings, errors
 
 
 def node_has_role(node: dict, role: str) -> bool:
@@ -1583,6 +1774,29 @@ def validate_fidelity_metadata(
                     "Exact reconstruction includes a caption-like node but source_visual_inventory.regions does not advertise caption crop coverage."
                 )
 
+    visual_grammar = metadata.get("visual_grammar_inventory")
+    if not isinstance(visual_grammar, dict):
+        contract_issue(
+            "Exact reconstruction should record `metadata.visual_grammar_inventory` before choosing components. "
+            "List source shape/cell/line/symbol/wave/text facts so components preserve visual grammar instead of normalizing the figure."
+        )
+    else:
+        non_empty_keys = 0
+        for key in VISUAL_GRAMMAR_INVENTORY_KEYS:
+            value = visual_grammar.get(key)
+            if value is None:
+                contract_issue(f"metadata.visual_grammar_inventory.{key} is missing; record source-visible facts even when the list is short.")
+                continue
+            if not isinstance(value, list):
+                contract_issue(f"metadata.visual_grammar_inventory.{key} should be an array of source-visible facts.")
+                continue
+            if value:
+                non_empty_keys += 1
+        if non_empty_keys < 2:
+            contract_issue(
+                "metadata.visual_grammar_inventory is too sparse; exact replicas need at least two visual-fact categories such as cells plus lines, or symbols plus text."
+            )
+
     page = scene.get("page", {})
     if not isinstance(page, dict):
         return
@@ -1815,7 +2029,7 @@ def validate_arrow_plan_contract(
             edges_by_plan.setdefault(plan_id, []).append(edge)
             if plan_id not in plan_ids:
                 contract_issue(f"Edge `{edge_id}` references unknown arrow_plan_id `{plan_id}`.")
-        elif exact_mode and edge.get("type") not in {"line_segment"}:
+        elif exact_mode and edge.get("type") not in {"line_segment"} and not is_internal_edge(edge):
             unplanned_edges.append(edge_id)
 
     for node_id, node in nodes_by_id.items():
@@ -1826,7 +2040,7 @@ def validate_arrow_plan_contract(
                 motif_edges_by_plan.setdefault(plan_id, []).append(motif_edge)
                 if plan_id not in plan_ids:
                     contract_issue(f"Node `{node_id}` motif_edge `{motif_edge_id}` references unknown arrow_plan_id `{plan_id}`.")
-            elif exact_mode:
+            elif exact_mode and not is_internal_edge(motif_edge):
                 contract_issue(f"Node `{node_id}` motif_edge `{motif_edge_id}` has no arrow_plan_id.")
 
     for plan_id in sorted(active_plan_ids):
@@ -3331,6 +3545,16 @@ def validate_scene(scene: dict, strict: bool = False) -> tuple[list[str], list[s
                     if not isinstance(value, list) or len(value) != 4 or not all(isinstance(item, (int, float)) for item in value):
                         errors.append(f"Node `{node_id}` source_bbox_px must be [left, top, right, bottom].")
 
+        visual_warnings, visual_errors = visual_grammar_node_findings(
+            node,
+            str(node_id),
+            node_type if isinstance(node_type, str) else None,
+            exact_mode=exact_mode,
+            strict_contract=strict,
+        )
+        warnings.extend(visual_warnings)
+        errors.extend(visual_errors)
+
         if node_type == "probability_bar_list":
             items = node.get("items", node.get("rows", []))
             if items is not None and not isinstance(items, list):
@@ -3550,7 +3774,9 @@ def validate_scene(scene: dict, strict: bool = False) -> tuple[list[str], list[s
             continue
         warnings.extend(font_validation_warnings(node, style, exact_mode))
         warnings.extend(text_fit_warnings(node, style, exact_mode))
-        warnings.extend(strict_text_shrink_warnings(node, style, exact_mode))
+        text_shrink_warnings, text_shrink_errors = strict_text_shrink_findings(node, style, exact_mode, strict_contract=strict)
+        warnings.extend(text_shrink_warnings)
+        errors.extend(text_shrink_errors)
     validate_alignment(nodes_by_id, node_types_by_id, containers_by_node, warnings)
     validate_boundary_ports(nodes_by_id, node_types_by_id, warnings, errors)
     validate_large_figure_discipline(
@@ -3578,6 +3804,15 @@ def validate_scene(scene: dict, strict: bool = False) -> tuple[list[str], list[s
         edge_type = edge.get("type")
         if edge_type not in edge_types:
             errors.append(f"Unsupported edge type `{edge_type}` for edge `{edge_id}`.")
+
+        role = edge.get("edge_role")
+        if role is not None:
+            if not isinstance(role, str):
+                errors.append(f"Edge `{edge_id}` edge_role must be a string.")
+            elif role not in EDGE_ROLES:
+                errors.append(
+                    f"Edge `{edge_id}` edge_role `{role}` is unsupported; use data_flow, context_flow, feedback_flow, decorative_internal, symbol_internal, or icon_internal."
+                )
 
         source = edge.get("from")
         target = edge.get("to")
@@ -3694,6 +3929,8 @@ def validate_scene(scene: dict, strict: bool = False) -> tuple[list[str], list[s
                 route_points = edge_route_points(edge, style, nodes_by_id)
             except Exception as exc:
                 warnings.append(f"Edge `{edge_id}` route could not be linted: {exc}")
+                continue
+            if is_internal_edge(edge):
                 continue
 
             route_name = edge.get("route") or edge.get("style", {}).get("route") or style.get("route") or "auto"
