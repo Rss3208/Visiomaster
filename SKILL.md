@@ -47,10 +47,10 @@ This skill is Windows-first and expects:
 - local Microsoft Visio desktop installed
 - Python with `pywin32`
 
-Use the active thread default Python interpreter. If the user or project provides a specific Python path, use that; otherwise use:
+Use the active thread default Python interpreter. On this machine, prefer:
 
 ```powershell
-python
+C:\anaconda\envs\jht\python.exe
 ```
 
 ## Workflow
