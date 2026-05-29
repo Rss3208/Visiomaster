@@ -502,7 +502,13 @@ Supported node families:
 - `text_block`
 - `caption_block`
 - `grid_matrix`
+- `cell_strip`
+- `micro_grid`
 - `token_grid`
+- `polyline_wave`
+- `symbol_group`
+- `shape_cluster`
+- `primitive_group`
 - `bracket`
 - `junction_point`
 - `image_tile`

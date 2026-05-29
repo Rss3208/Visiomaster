@@ -1418,7 +1418,7 @@ Selection priority for cell-like visuals:
 
 ### `token_grid`
 
-Use `token_grid` for visible colored token or index tiles that contain readable numbers or short labels. This differs from `grid_matrix`: cells have gaps, rounded corners, per-cell fill colors, and optional centered text. It is useful for variable-length prefix sequences, padded batch matrices, top-k probability rows, and small numbered grids.
+Use `token_grid` for visible colored token or index tiles that contain readable numbers or short labels. This differs from `cell_strip`, `micro_grid`, and `grid_matrix`: cells have gaps, intentional rounding, per-cell fill colors, and optional centered text. It is useful for variable-length prefix sequences, padded batch matrices, top-k probability rows, and small numbered grids where token identity or per-cell labels are visible.
 
 ```json
 {
@@ -1445,7 +1445,7 @@ Use `token_grid` for visible colored token or index tiles that contain readable 
 }
 ```
 
-Use `grid_matrix` instead when the source shows a contiguous grid with shared grid lines and no text in cells.
+Use `cell_strip`, `micro_grid`, or `grid_matrix` instead when the source shows unlabeled rectangular cells. Do not use `token_grid` merely because the unit is a small colored cell group; doing so can turn source-rectangular cells into rounded token-like marks.
 
 For dense batch matrices, keep the grid as one `token_grid` with explicit row/col cells. Do not hand-place individual token boxes unless the source truly has irregular spacing. If cell text overlaps after render, reduce `cell_font_size_pt` or rely on `cell_text_fit`, then re-review the crop visually.
 
