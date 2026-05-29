@@ -1410,6 +1410,12 @@ Use `grid_matrix` for convolution kernels, receptive fields, checkerboard masks,
 
 The renderer creates editable cell rectangles and separate grid lines inside Visio. Do not hand-place 81 small boxes when one `grid_matrix` can express the structure.
 
+Selection priority for cell-like visuals:
+- use `cell_strip` for repeated unlabeled rectangular cells in a row or column, especially when the source shows low rounding or continuous cell grammar
+- use `micro_grid` for compact matrix/tensor tiles with thin rectangular cells
+- use `grid_matrix` for larger contiguous shared-line matrices without per-cell text
+- use `token_grid` only when the source visibly shows readable numbers or short labels, separated token/index cells, or intentionally rounded/gapped token tiles
+
 ### `token_grid`
 
 Use `token_grid` for visible colored token or index tiles that contain readable numbers or short labels. This differs from `grid_matrix`: cells have gaps, rounded corners, per-cell fill colors, and optional centered text. It is useful for variable-length prefix sequences, padded batch matrices, top-k probability rows, and small numbered grids.
