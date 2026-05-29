@@ -579,6 +579,27 @@ Use `audit_region` for figures that have no visible dashed modules but still nee
 
 Use this when the source visually contains a logical block such as residual network, attention, classifier, feature extraction chain, or repeated BN/R/M/C sequence, but no visible boundary is drawn. Do not connect edges to `audit_region`; use normal component endpoints or `boundary_port` only when a visible boundary output exists.
 
+### `legend_block`
+
+Use `legend_block` for compact color/key explanations that should remain editable. It draws a frame plus editable swatches and labels from `items`:
+
+```json
+{
+  "id": "legend",
+  "type": "legend_block",
+  "x": 0.6,
+  "y": 6.8,
+  "w": 4.8,
+  "h": 0.8,
+  "items": [
+    {"label": "Planning", "color": "#219653"},
+    {"label": "Simulation", "color": "#F2994A"}
+  ]
+}
+```
+
+Optional layout controls include `columns`, `padding_x_in`, `padding_y_in`, `swatch_size_in`, `label_gap_in`, and `item_gap_in`.
+
 ### `operator_node`
 
 Use `operator_node` for explicit paper-figure operators such as plus, multiply, tensor product, add, concat markers, or attention gates. Do not fake these as text floating over a connector.
@@ -838,6 +859,8 @@ Optional edge fields:
   "z": 100
 }
 ```
+
+Edge labels are rendered as small editable text boxes with a white background and a slight default offset from the route midpoint. This prevents the connector from visually cutting through the label. For dense diagrams, prefer explicit `text_block` labels placed in free space when the default midpoint is not semantically clear.
 
 Endpoint syntax currently supports:
 - `node-id`

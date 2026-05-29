@@ -752,6 +752,73 @@ def draw_text_box(
     return shape
 
 
+def draw_legend_block(page: Any, page_height: float, node: dict[str, Any], style: dict[str, Any]) -> Any:
+    frame = draw_rectangle(page, page_height, node)
+    apply_style(frame, style, node.get("text", ""))
+
+    items = node.get("items", [])
+    if not isinstance(items, list):
+        items = []
+    if not items:
+        return frame
+
+    x = float(node["x"])
+    y = float(node["y"])
+    width = float(node["w"])
+    height = float(node["h"])
+    padding_x = float(node.get("padding_x_in", style.get("padding_x_in", 0.18)))
+    padding_y = float(node.get("padding_y_in", style.get("padding_y_in", 0.12)))
+    swatch = float(node.get("swatch_size_in", style.get("swatch_size_in", 0.12)))
+    gap = float(node.get("item_gap_in", style.get("item_gap_in", 0.18)))
+    label_gap = float(node.get("label_gap_in", style.get("label_gap_in", 0.08)))
+    font_size = float(node.get("font_size_pt", style.get("font_size_pt", 10)))
+
+    inner_w = max(0.1, width - 2 * padding_x)
+    inner_h = max(0.1, height - 2 * padding_y)
+    columns = int(node.get("columns", 0) or min(len(items), max(1, int(inner_w // 2.6))))
+    columns = max(1, min(columns, len(items)))
+    rows = int(math.ceil(len(items) / columns))
+    col_w = inner_w / columns
+    row_h = inner_h / max(1, rows)
+
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            item = {"label": str(item), "color": "#64748B"}
+        col = index % columns
+        row = index // columns
+        item_x = x + padding_x + col * col_w
+        item_y = y + padding_y + row * row_h + max(0.0, (row_h - swatch) / 2)
+        swatch_node = {"x": item_x, "y": item_y, "w": swatch, "h": swatch}
+        swatch_shape = draw_rectangle(page, page_height, swatch_node)
+        apply_style(
+            swatch_shape,
+            merge_style(
+                style,
+                {
+                    "fill": item.get("color", item.get("fill", "#64748B")),
+                    "line": item.get("line", item.get("color", item.get("fill", "#64748B"))),
+                    "line_weight_pt": 0.5,
+                },
+                item.get("style") if isinstance(item.get("style"), dict) else None,
+            ),
+        )
+        label = str(item.get("label", item.get("text", "")))
+        if label:
+            label_x = item_x + swatch + label_gap
+            label_w = max(0.1, col_w - swatch - label_gap - gap)
+            draw_text_box(
+                page,
+                page_height,
+                label_x,
+                item_y - max(0.02, (0.22 - swatch) / 2),
+                label_w,
+                max(0.22, swatch + 0.04),
+                label,
+                merge_style(style, {"font_size_pt": font_size, "text_align": 0, "vertical_align": 1}),
+            )
+    return frame
+
+
 def draw_math_vector(page: Any, page_height: float, node: dict[str, Any], style: dict[str, Any]) -> Any:
     x = float(node["x"])
     y = float(node["y"])
@@ -2030,8 +2097,10 @@ def draw_node(
             shape = draw_group_container(page, page_height, node, style)
         elif render_kind == "audit_region":
             shape = draw_rectangle(page, page_height, node)
-        elif render_kind in {"rectangle", "rounded_rectangle", "terminator", "pill", "legend_block", "text_block"}:
+        elif render_kind in {"rectangle", "rounded_rectangle", "terminator", "pill", "text_block"}:
             shape = draw_rectangle(page, page_height, node)
+        elif render_kind == "legend_block":
+            shape = draw_legend_block(page, page_height, node, style)
         elif render_kind == "oval":
             shape = draw_oval(page, page_height, node)
         elif render_kind == "polygon_node":
@@ -2087,10 +2156,10 @@ def draw_node(
             raise ValueError(f"Unsupported renderer: {render_kind}")
 
     text = node.get("text")
-    if text and render_kind not in {"bracket", "wave_signal", "classifier_head", "boundary_fanout", "feature_map_grid", "group_container", "audit_region", "operator_node", "math_vector", "math_text", "tfr_panel", "loss_region"}:
+    if text and render_kind not in {"bracket", "wave_signal", "classifier_head", "boundary_fanout", "feature_map_grid", "group_container", "audit_region", "operator_node", "math_vector", "math_text", "tfr_panel", "loss_region", "legend_block"}:
         try_set_text(shape, str(text))
 
-    if render_kind not in {"bracket", "feature_map_banded", "feature_map_grid", "merge_bus", "wave_signal", "classifier_head", "boundary_fanout", "group_container", "operator_node", "math_vector", "math_text", "tfr_panel", "loss_region"}:
+    if render_kind not in {"bracket", "feature_map_banded", "feature_map_grid", "merge_bus", "wave_signal", "classifier_head", "boundary_fanout", "group_container", "operator_node", "math_vector", "math_text", "tfr_panel", "loss_region", "legend_block"}:
         apply_style(shape, style, node.get("text", node.get("symbol", "")))
     if render_kind == "terminator" and "rounding_in" not in style:
         try_set_formula(shape, "Rounding", f"{min(float(node['h']) / 2, 0.25)} in")
@@ -2314,25 +2383,40 @@ def draw_edge(
 
 
 def draw_edge_label(page: Any, page_height: float, text: str, mid_x: float, mid_y: float, profile: dict[str, Any]) -> Any:
+    cleaned = str(text).strip()
+    if not cleaned:
+        return None
+    width = max(0.32, min(1.3, 0.08 + approximate_text_width(cleaned, 10) + 0.16))
+    height = 0.22
+    if len(cleaned) <= 8:
+        dy = 0.16
+    elif len(cleaned) <= 16:
+        dy = 0.18
+    else:
+        dy = 0.2
     shape = page.DrawRectangle(
-        mid_x - 0.45,
-        to_visio_y(page_height, mid_y + 0.12),
-        mid_x + 0.45,
-        to_visio_y(page_height, mid_y - 0.12),
+        mid_x - width / 2,
+        to_visio_y(page_height, mid_y + dy),
+        mid_x + width / 2,
+        to_visio_y(page_height, mid_y + dy - height),
     )
-    try_set_text(shape, text)
+    try_set_text(shape, cleaned)
     apply_style(
         shape,
         merge_style(
             profile.get("global_text"),
             {
-                "fill": "none",
+                "fill": "#FFFFFF",
                 "line": "none",
                 "font_size_pt": 10,
                 "font_weight": "regular",
+                "text_margin_left_in": 0.02,
+                "text_margin_right_in": 0.02,
+                "text_margin_top_in": 0.01,
+                "text_margin_bottom_in": 0.01,
             },
         ),
-        text,
+        cleaned,
     )
     return shape
 
