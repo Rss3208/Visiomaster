@@ -253,6 +253,7 @@ def checklist_ids(items: list[dict[str, Any]]) -> set[str]:
 def validate_checklists(findings_doc: dict[str, Any], findings: list[dict[str, Any]], require: bool) -> dict[str, Any]:
     topology = normalize_checklist(findings_doc.get("topology_checklist"), "topology_checklist")
     visual = normalize_checklist(findings_doc.get("visual_checklist"), "visual_checklist")
+    fidelity = normalize_checklist(findings_doc.get("fidelity_checklist"), "fidelity_checklist")
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -263,10 +264,10 @@ def validate_checklists(findings_doc: dict[str, Any], findings: list[dict[str, A
 
     valid_status = {"pass", "fail", "uncertain"}
     valid_certainty = {"certain", "inferred", "uncertain"}
-    all_ids = checklist_ids(topology) | checklist_ids(visual)
+    all_ids = checklist_ids(topology) | checklist_ids(visual) | checklist_ids(fidelity)
     failed_ids: set[str] = set()
 
-    for name, items in (("topology_checklist", topology), ("visual_checklist", visual)):
+    for name, items in (("topology_checklist", topology), ("visual_checklist", visual), ("fidelity_checklist", fidelity)):
         seen: set[str] = set()
         for index, item in enumerate(items):
             item_id = str(item.get("id", "")).strip()
@@ -312,6 +313,7 @@ def validate_checklists(findings_doc: dict[str, Any], findings: list[dict[str, A
     return {
         "topology_checklist": topology,
         "visual_checklist": visual,
+        "fidelity_checklist": fidelity,
         "checklist_validation": {
             "required": require,
             "errors": errors,
@@ -332,7 +334,7 @@ def main() -> int:
     parser.add_argument(
         "--require-checklists",
         action="store_true",
-        help="Fail unless topology_checklist and visual_checklist are present and well-formed.",
+        help="Fail unless topology_checklist and visual_checklist are present and all checklist arrays are well-formed.",
     )
     parser.add_argument("--output", required=True, help="Output scene_rebuild_brief.json path")
     args = parser.parse_args()
@@ -383,6 +385,7 @@ def main() -> int:
         "rebuild_focus_regions": focus_regions,
         "topology_checklist": checklist_report["topology_checklist"],
         "visual_checklist": checklist_report["visual_checklist"],
+        "fidelity_checklist": checklist_report["fidelity_checklist"],
         "checklist_validation": checklist_report["checklist_validation"],
         "findings_digest": [finding_digest(finding) for finding in findings],
         "arrow_plan_repair_targets": arrow_repair_targets,

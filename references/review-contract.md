@@ -111,9 +111,19 @@ The visual reviewer writes concrete diffs in this format:
       "certainty": "certain"
     }
   ],
-  "findings": [
+  "fidelity_checklist": [
     {
       "id": "F001",
+      "focus_region": "icon_row",
+      "source_expectation": "Worker icons preserve helmets, limbs, and workwear color split; they are not simplified to generic person blobs.",
+      "replica_status": "Not reviewed.",
+      "status": "uncertain",
+      "certainty": "certain"
+    }
+  ],
+  "findings": [
+    {
+      "id": "D001",
       "severity": "blocking",
       "summary": "Right-side output topology is wrong",
       "visible_diff": "The source has a vertical Linear -> inverse projection -> f-hat -> bracket merge chain. The replica keeps a horizontal capsule-like Linear node and the merge landing point is wrong.",
@@ -132,6 +142,7 @@ The checklist fields are the reviewer's source-derived acceptance criteria:
 
 - `topology_checklist` is for visible source graph facts: arrow direction, endpoints, route shape, branches, merges, shared trunks, boundary crossings, operator order, and required special components. It is not a schema check; it comes from visual comparison of the original source and replica.
 - `visual_checklist` is for local appearance and visual grammar facts: overlap, line-through-text, label wrapping, cell count/gap/rounding, symbol internals, sampled wave shape, bracket/tensor spacing, tensor thickness, title position, font role, line weight, color, rounding, and shadow.
+- `fidelity_checklist` is for source-object obligations that must not be simplified away: worker/person details, crossed tools, node-link motifs, dense device icons, and ribbon-arrow body/head geometry.
 - `status` should be `pass`, `fail`, or `uncertain`. Use `uncertain` when the source crop is unclear; do not invent topology.
 - Findings should cite failed checklist ids through `checklist_refs` when possible.
 - A review may include passing checklist items. They help later rounds avoid regressing details that already match.

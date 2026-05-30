@@ -62,7 +62,7 @@ def validate_items(items: list[dict[str, Any]], kind: str, failures: list[str], 
             warnings.append(f"{label} has no replica_status.")
         if kind == "topology_checklist" and not item.get("source_fact"):
             failures.append(f"{label} is missing source_fact.")
-        if kind == "visual_checklist" and not item.get("source_expectation"):
+        if kind in {"visual_checklist", "fidelity_checklist"} and not item.get("source_expectation"):
             failures.append(f"{label} is missing source_expectation.")
     return ids
 
@@ -83,6 +83,8 @@ def main() -> int:
 
     topology = as_list(doc.get("topology_checklist"), "topology_checklist", failures)
     visual = as_list(doc.get("visual_checklist"), "visual_checklist", failures)
+    fidelity_raw = doc.get("fidelity_checklist", [])
+    fidelity = as_list(fidelity_raw, "fidelity_checklist", failures) if fidelity_raw is not None else []
     if not topology:
         failures.append("topology_checklist is empty.")
     if not visual:
@@ -90,9 +92,10 @@ def main() -> int:
 
     ids = validate_items(topology, "topology_checklist", failures, warnings)
     ids |= validate_items(visual, "visual_checklist", failures, warnings)
+    ids |= validate_items(fidelity, "fidelity_checklist", failures, warnings)
     failed_ids = {
         str(item.get("id", "")).strip()
-        for item in topology + visual
+        for item in topology + visual + fidelity
         if str(item.get("status", "")).strip().lower() == "fail" and str(item.get("id", "")).strip()
     }
 
@@ -136,6 +139,7 @@ def main() -> int:
         "warnings": warnings,
         "topology_count": len(topology),
         "visual_count": len(visual),
+        "fidelity_count": len(fidelity),
         "failed_checklist_ids": sorted(failed_ids),
     }
     if args.output_report:
@@ -156,6 +160,7 @@ def main() -> int:
     print("REVIEW CHECKLIST GATE PASSED")
     print(f"- topology checklist items: {len(topology)}")
     print(f"- visual checklist items: {len(visual)}")
+    print(f"- fidelity checklist items: {len(fidelity)}")
     print(f"- failed checklist ids: {len(failed_ids)}")
     if warnings:
         print("Warnings:")

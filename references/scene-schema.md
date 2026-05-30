@@ -137,6 +137,7 @@ Rules for `source_visual_inventory`:
 - Describe visible motifs from the crop: colored cell grid, 3D tensor slabs, vertical strips, dashed frame, bus/junction, boundary port, brace merge, top-k bar panel, and similar source-visible structures.
 - Record layout facts, not only names: text alignment, expected line breaks, no-wrap areas, caption centering, serif/sans/CJK/math role, visible shadows, and whether a text line contains embedded math fragments.
 - Record style facts too: `box_style_facts`, `line_style_facts`, `shadow_facts`, and `density_facts` are how strict replica work remembers padding, rounding, line grammar, softness, and tight/loose spacing.
+- Record `fidelity_obligations` for small or identity-bearing objects where simplification would visibly break the source, such as worker/person icons, crossed tools, neural-network node-link motifs, device icons, thick ribbon arrows, and dense symbol clusters.
 - Use old scenes and old visual reviews only as failure evidence. A new capability evaluation scene should be authored fresh from this inventory.
 - A batch script may export multiple already-authored scenes, but a batch script that writes all scenes is not evidence that the skill can reconstruct new images from visual analysis.
 
@@ -148,7 +149,7 @@ For exact replicas, also add `metadata.visual_grammar_inventory` before choosing
     "visual_grammar_inventory": {
       "shape_facts": ["thin rounded rectangle", "outlined triangle"],
       "cell_facts": ["continuous rectangular cells", "5 columns", "low rounding"],
-      "line_facts": ["solid horizontal", "dashed orthogonal", "arrowhead at end"],
+      "line_facts": ["solid horizontal", "dashed orthogonal", "arrowhead at end", "thick ribbon arrow"],
       "symbol_facts": ["circle plus", "triangle gate"],
       "wave_facts": ["polyline-like", "single peak", "noisy high frequency"],
       "text_facts": ["single-line math", "bold centered title"]
@@ -157,7 +158,31 @@ For exact replicas, also add `metadata.visual_grammar_inventory` before choosing
 }
 ```
 
-The rule is: components are rendering grammar, not recognition conclusions. Use the inventory to parameterize `cell_strip`, `micro_grid`, `polyline_wave`, `symbol_group`, `shape_cluster`, `primitive_group`, or a higher-level component. If a component would change a source fact, for example turning rectangular cells into rounded tokens, choose a primitive instead.
+The rule is: components are rendering grammar, not recognition conclusions. Use the inventory to parameterize `cell_strip`, `micro_grid`, `polyline_wave`, `symbol_group`, `shape_cluster`, `primitive_group`, `ribbon_arrow`, `curved_ribbon_arrow`, `loop_ribbon_arrow`, or a higher-level component. If a component would change a source fact, for example turning rectangular cells into rounded tokens or a thick filled arrow into a thin connector, choose the source-matched primitive instead.
+
+`fidelity_obligations` may live under `metadata.source_visual_inventory.regions[]` or on a source-bound node. They are review and audit contracts for details that should not be normalized into generic shapes.
+
+```json
+{
+  "id": "icon_row",
+  "source_bbox_px": [80, 420, 820, 520],
+  "fidelity_obligations": [
+    {
+      "object": "worker_icons",
+      "must_preserve": ["helmet", "torso", "arms", "legs", "workwear color split"],
+      "allowed_simplification": ["minor facial features"],
+      "forbidden_simplification": ["single generic circle plus rectangle person"]
+    },
+    {
+      "object": "network_data_icon",
+      "must_preserve": ["visible nodes", "inter-node lines", "blue/orange node colors"],
+      "forbidden_simplification": ["plain grid without node-link motif"]
+    }
+  ]
+}
+```
+
+In strict replica mode, every obligation should produce a review checklist item. If `forbidden_simplification` describes a known bad replacement, the review/audit result can be blocking even when the scene is structurally valid.
 
 For exact replicas, add an arrow inventory before authoring edges. This is a source-image visual contract: it records which arrow connects what, whether it is straight/orthogonal/curved, where it lands, and whether it carries an arrowhead. Scene edges should reference these entries through `arrow_plan_id`.
 
@@ -371,11 +396,18 @@ Optional node fields:
   "align_group": "row-1",
   "align_axis": "center_y",
   "align_tolerance_in": 0.05,
+  "layer": "text",
   "z": 10
 }
 ```
 
 Use alignment fields when reconstructing module boxes such as AM-ResNet. If a component should sit on the visual midline of its parent block, set `container_id` and `align_to_container: ["center_y"]`. If several sibling nodes should share one row, give them the same `align_group` and `align_axis`.
+
+Rendering order is unified across nodes, edges, and edge labels. Use `z` for exact local order, or use layer names when the source has a common depth relationship:
+
+`background < panel < arrow_under_text < icon < text < foreground_arrow`
+
+This means broad loop arrows, ribbon arrows, and dashed feedback paths can sit behind labels without moving their geometry away from the source.
 
 Supported node `type` values are defined in `templates/visio_components.json`.
 
@@ -390,7 +422,7 @@ Recommended semantic fields:
 - `topology_motif`: local connection grammar such as `branch_trunk`, `merge_trunk`, `paper_bus`.
 
 Recommended visual-grammar fields for small source-bound primitives:
-- `primitive_family`: one of `cell_strip`, `polyline_wave`, `symbol_group`, `shape_cluster`, `primitive_group`, `compact_grid`, `micro_grid`, or `text_formula`.
+- `primitive_family`: one of `cell_strip`, `polyline_wave`, `ribbon_arrow`, `symbol_group`, `shape_cluster`, `primitive_group`, `compact_grid`, `micro_grid`, or `text_formula`.
 - `motif_binding`: stable id linking this node to a source motif/fact such as `m2_gate_symbol`.
 - `visual_facts` / `source_visual_facts`: object or array describing what the source unit visibly is, such as `primitive_family: symbol_group`, `shape: triangle_in_circle`, `rounding: low`, `line_weight: thin`, or `fill_policy: source_matched`.
 - `must_match_facts`: source facts that visual review must check after rendering, for example `5 rectangular cells`, `single-peak polyline`, or `triangle remains inside circle`.
@@ -565,8 +597,33 @@ Use these components when the source crop contains small editable details rather
 - `concat_operator`: visible `[]`/bracket concat marks or compact concat bars; add `ports`/`port_positions` when three or more inputs converge.
 - `brace_merge`: curly many-to-one braces; add `tick_positions`/`port_positions` for visible aligned merge ticks.
 - `multi_port_junction`: explicit editable junction/bus spine when several arrows share one vertical or horizontal connection line.
+- `ribbon_arrow`, `curved_ribbon_arrow`, `loop_ribbon_arrow`: filled/thick arrows used as visual objects, not thin connectors.
 
 Bind compact grids/vectors/operators to `source_bbox_px` when the original crop has exact cell counts, tiny labels, or port positions. This lets later visual review distinguish a scene-analysis mistake from renderer limitations.
+
+### Ribbon Arrow Nodes
+
+Use ribbon-arrow nodes when the source arrow is a thick filled graphic or gradient-like band. Do not replace it with a normal connector just because it has a direction.
+
+```json
+{
+  "id": "qualitative_change",
+  "type": "ribbon_arrow",
+  "x": 312,
+  "y": 485,
+  "w": 95,
+  "h": 56,
+  "direction": "right",
+  "body_width_px": 22,
+  "head_width_px": 58,
+  "head_length_px": 42,
+  "fill": "#2E88B5",
+  "layer": "arrow_under_text",
+  "must_match_facts": ["filled right arrow", "wide triangular head", "sits behind row labels"]
+}
+```
+
+For broad curved arrows, use `curved_ribbon_arrow` with source-sampled `points`; for cycle/update bands, use `loop_ribbon_arrow` with `start_angle_deg`, `sweep_angle_deg`, and source-matched `body_width_px`. These are visual arrow objects, so they should usually be nodes rather than `edges[]`.
 
 ### `notched_block`
 

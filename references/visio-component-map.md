@@ -17,6 +17,10 @@ It uses a controlled semantic vocabulary so the analysis side stays stable while
 | `cell_strip` | repeated rectangular cells in a row/column | editable low-rounding cells with explicit count/gap |
 | `micro_grid` | small matrix/tensor tile that should not become rounded tokens | editable rectangular cells and thin grid lines |
 | `polyline_wave` | source-specific waveform/polyline silhouette | explicit samples/points, no generic sine in strict replicas |
+| `ribbon_arrow` | straight filled/thick arrow used as a visual object | editable polygon-style arrow |
+| `curved_ribbon_arrow` | broad curved arrow or gradient-like flow band | thick editable path with arrowhead |
+| `loop_ribbon_arrow` | broad cycle/update loop arrow | sampled loop path with thick stroke and arrowhead |
+| `qualitative_change_arrow` | preset for straight qualitative-change ribbon arrows | `ribbon_arrow` geometry with wider head defaults |
 | `process_box` | standard process/module block | rectangle |
 | `rounded_process` | softer process block | rounded rectangle |
 | `stacked_process` | repeated offset feature/map block shown as one semantic node | repeated editable rounded rectangles |
@@ -84,7 +88,7 @@ Components are rendering grammar, not recognition conclusions. Source visual fac
 Use this order:
 
 1. Inventory the source visual facts first: shape family, cell count/gap/rounding, line style, symbol internals, wave samples, text role.
-2. If the unit is just repeated rectangles/circles/lines/polylines, use a primitive (`cell_strip`, `micro_grid`, `polyline_wave`, `symbol_group`, `shape_cluster`, or `primitive_group`) instead of inventing a business component.
+2. If the unit is just repeated rectangles/circles/lines/polylines or a thick filled arrow, use a primitive (`cell_strip`, `micro_grid`, `polyline_wave`, `ribbon_arrow`, `curved_ribbon_arrow`, `loop_ribbon_arrow`, `symbol_group`, `shape_cluster`, or `primitive_group`) instead of inventing a business component.
 3. Use a higher-level component only when its parameters can preserve the recorded facts.
 4. If a component would change the facts, such as rectangular cells becoming rounded tokens, a noisy source wave becoming a sine wave, or icon-internal lines becoming flow arrows, fail that component choice and switch to a primitive.
 5. Mark icon/symbol internals with `subshape_role` or `edge_role: "symbol_internal"` / `"icon_internal"` / `"decorative_internal"` so topology audit does not treat them as main flow connectors.
@@ -133,6 +137,8 @@ Use `cell_strip` when the source has a row/column of rectangular cells. Set `cel
 Use `micro_grid` when the source has a compact matrix/tensor tile with thin rectangular cells. Use `grid_matrix` for larger semantic matrices; use `micro_grid` for local icon-scale or tensor-scale grids where exact cell grammar matters.
 
 Use `polyline_wave` for source-specific waveforms and signal silhouettes. Provide explicit `points` or `samples`; do not use a generic sine fallback in exact replica scenes.
+
+Use `ribbon_arrow` / `curved_ribbon_arrow` / `loop_ribbon_arrow` when the source arrow is a filled or very thick graphic. Ordinary connectors are for thin lines; they should not replace broad qualitative-change arrows, infographic bands, or loop arrows that visually sit behind labels. Put broad arrows on `layer: "arrow_under_text"` unless the source places them above text.
 
 Use `symbol_group`, `shape_cluster`, or `primitive_group` for composed symbols and small local structures. Provide `subshapes` when the built-in `symbol_kind` is not enough. Subshape `bbox` values are local `[x, y, w, h]` values relative to the parent bbox when between 0 and 1.
 

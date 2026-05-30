@@ -19,6 +19,7 @@ from scene_to_visio import (
 from scene_validate import (
     CONTAINER_TYPES,
     INTERNAL_EDGE_ROLES,
+    RIBBON_ARROW_NODE_TYPES,
     STRICT_REPLICA_REVIEW_MODES,
     STRICT_REQUIRED_REGION_CATEGORIES,
     VISUAL_GRAMMAR_NODE_TYPES,
@@ -328,6 +329,20 @@ def source_visual_inventory_items(metadata: dict[str, Any], nodes: list[dict[str
                 f"- [ ] [REBUILD] source_visual_inventory region `{region_name}` has no box/line/shadow/density facts; "
                 "exact review needs explicit style evidence for padding, rounding, line grammar, shadow softness, or region density."
             )
+        obligations = region.get("fidelity_obligations")
+        if obligations is not None and not isinstance(obligations, list):
+            items.append(
+                f"- [ ] [REBUILD] source_visual_inventory region `{region_name}` has invalid fidelity_obligations; use an array of source objects with must_preserve/forbidden_simplification."
+            )
+        elif isinstance(obligations, list):
+            for obligation in obligations:
+                if not isinstance(obligation, dict):
+                    continue
+                if not obligation.get("must_preserve"):
+                    items.append(
+                        f"- [ ] [REBUILD] source_visual_inventory region `{region_name}` has a fidelity_obligation without must_preserve details."
+                    )
+                    break
     global_box = source_boxes.get("global")
     for category in ("input", "core", "output", "arrow_dense", "small_text", "caption"):
         if global_box and source_boxes.get(category) == global_box:
@@ -405,6 +420,7 @@ def arrow_plan_audit_items(metadata: dict[str, Any], edges: list[dict[str, Any]]
 
     edges_by_plan: dict[str, list[dict[str, Any]]] = {}
     motif_edges_by_plan: dict[str, list[dict[str, Any]]] = {}
+    ribbon_nodes_by_plan: dict[str, list[dict[str, Any]]] = {}
     unplanned_edges: list[str] = []
     for edge in edges:
         if not isinstance(edge, dict):
@@ -420,6 +436,13 @@ def arrow_plan_audit_items(metadata: dict[str, Any], edges: list[dict[str, Any]]
         if not isinstance(node, dict):
             continue
         node_id = str(node.get("id", "<missing-node>"))
+        node_type = str(node.get("type", ""))
+        node_plan_id = edge_arrow_plan_id(node)
+        if node_type in RIBBON_ARROW_NODE_TYPES:
+            if node_plan_id:
+                ribbon_nodes_by_plan.setdefault(node_plan_id, []).append(node)
+            else:
+                unplanned_edges.append(node_id)
         for motif_edge in node_motif_edges(node):
             motif_edge_id = str(motif_edge.get("id", f"{node_id}.motif_edge"))
             plan_id = edge_arrow_plan_id(motif_edge)
@@ -428,12 +451,12 @@ def arrow_plan_audit_items(metadata: dict[str, Any], edges: list[dict[str, Any]]
             else:
                 unplanned_edges.append(f"{node_id}.{motif_edge_id}")
 
-    covered_plan_ids = set(edges_by_plan) | set(motif_edges_by_plan)
+    covered_plan_ids = set(edges_by_plan) | set(motif_edges_by_plan) | set(ribbon_nodes_by_plan)
     missing_edges = sorted(active_plan_ids - covered_plan_ids)
     unknown_refs = sorted(covered_plan_ids - set(plan_by_id))
     if missing_edges:
         items.append(
-            f"- [ ] [REBUILD] arrow_plan_coverage: active source arrows with no scene edge: `{', '.join(missing_edges[:12])}`."
+            f"- [ ] [REBUILD] arrow_plan_coverage: active source arrows with no scene edge, motif_edge, or ribbon arrow node: `{', '.join(missing_edges[:12])}`."
         )
     if unknown_refs:
         items.append(
@@ -441,7 +464,7 @@ def arrow_plan_audit_items(metadata: dict[str, Any], edges: list[dict[str, Any]]
         )
     if unplanned_edges:
         items.append(
-            f"- [ ] [REBUILD] arrow_plan_coverage: visible scene edges without arrow_plan_id: `{', '.join(unplanned_edges[:12])}`."
+            f"- [ ] [REBUILD] arrow_plan_coverage: visible scene arrow elements without arrow_plan_id: `{', '.join(unplanned_edges[:12])}`."
         )
 
     for plan_id in sorted(covered_plan_ids):
@@ -488,6 +511,23 @@ def arrow_plan_audit_items(metadata: dict[str, Any], edges: list[dict[str, Any]]
         if missing:
             items.append(
                 f"- [ ] [REBUILD] source_anchor_mismatch risk: arrow_plan `{plan_id}` misses strict fields `{', '.join(missing[:6])}{' ...' if len(missing) > 6 else ''}`."
+            )
+        plan_text = recursive_fact_text(
+            {
+                "visual_form": plan.get("visual_form", plan.get("arrow_form")),
+                "line_style": plan.get("line_style"),
+                "source_fact": plan.get("source_fact"),
+                "relative_position_facts": plan.get("relative_position_facts"),
+            }
+        )
+        plan_requires_ribbon = any(token in plan_text for token in {"ribbon", "thick arrow", "filled arrow", "broad arrow", "band arrow"})
+        if plan_requires_ribbon and not ribbon_nodes_by_plan.get(plan_id):
+            items.append(
+                f"- [ ] [REBUILD] arrow_plan `{plan_id}` describes a ribbon/thick arrow but is not bound to a `ribbon_arrow`, `curved_ribbon_arrow`, or `loop_ribbon_arrow` node."
+            )
+        if plan_requires_ribbon and edges_by_plan.get(plan_id):
+            items.append(
+                f"- [ ] [REBUILD] arrow_plan `{plan_id}` describes a ribbon/thick arrow but is also bound to thin connector edge(s); use a ribbon arrow node instead of ordinary connectors."
             )
 
     return items
@@ -617,6 +657,15 @@ def audit_scene(scene: dict[str, Any]) -> str:
                 visual_grammar_items.append(
                     f"- [ ] [REBUILD] `{node_id}` is `polyline_wave` without points/samples; source-specific waves must not fall back to a generic curve."
                 )
+            if node_type in RIBBON_ARROW_NODE_TYPES:
+                if not any(node.get(key) is not None for key in ("body_width_in", "body_width_px", "head_width_in", "head_width_px")):
+                    visual_grammar_items.append(
+                        f"- [ ] [REBUILD] `{node_id}` is `{node_type}` without explicit body/head width; thick source arrows should preserve visible ribbon geometry."
+                    )
+                if not edge_arrow_plan_id(node):
+                    visual_grammar_items.append(
+                        f"- [ ] [REBUILD] `{node_id}` is a source-visible ribbon arrow without arrow_plan_id; bind it to the arrow inventory so direction and endpoint can be reviewed."
+                    )
             if node_type == "symbol_group":
                 subshapes = node.get("subshapes", node.get("parts", node.get("primitives")))
                 if exact_mode and not subshapes and not node.get("symbol_kind"):

@@ -66,6 +66,16 @@ Use this schema:
       "certainty": "certain"
     }
   ],
+  "fidelity_checklist": [
+    {
+      "id": "F001",
+      "focus_region": "icon_or_ribbon_detail",
+      "source_expectation": "Concrete source-object detail that must not be simplified, such as visible nodes/links, crossed tools, worker limbs/helmet, or thick ribbon arrow head/body geometry.",
+      "replica_status": "Whether the replica preserves, simplifies, omits, or ambiguously renders that detail.",
+      "status": "uncertain",
+      "certainty": "certain"
+    }
+  ],
   "findings": [
     {
       "id": "F001",
@@ -87,6 +97,7 @@ The checklist fields are mandatory for exact-replica reviews:
 
 - `topology_checklist`: source-derived graph facts. Check branches, merges, shared trunks, operator order, arrow direction, arrow endpoints, boundary crossings, and required special components.
 - `visual_checklist`: source-derived layout/style/visual-grammar facts. Check overlap, line-through-text, label wrapping, cell count/gap/rounding, symbol internals, sampled wave shape, math text attachment, bracket/tensor spacing, feature-stack thickness, title placement, color, rounding, line weight, and shadow.
+- `fidelity_checklist`: source-object obligations that must not be simplified away. Check worker/person details, crossed tools, neural-network node-link motifs, dense device/icon internals, and thick/ribbon arrow body-head shape.
 - `status`: use `pass`, `fail`, or `uncertain`.
 - `certainty`: use `certain`, `inferred`, or `uncertain`.
 - Use `uncertain` instead of inventing details when a source crop is unclear.

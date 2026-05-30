@@ -292,6 +292,15 @@ def normalize_scene_coordinates(scene: dict[str, Any]) -> dict[str, Any]:
             if key in node:
                 node[key] = scale_nested_relative_or_absolute(node[key], sy)
         scale_in_fields_recursive(node, sx, sy)
+        for px_key, inch_key, scale_value in (
+            ("body_width_px", "body_width_in", min(sx, sy)),
+            ("head_width_px", "head_width_in", min(sx, sy)),
+            ("head_length_px", "head_length_in", sx),
+            ("ribbon_width_px", "body_width_in", min(sx, sy)),
+            ("corner_radius_px", "corner_radius_in", min(sx, sy)),
+        ):
+            if isinstance(node.get(px_key), (int, float)) and inch_key not in node:
+                node[inch_key] = float(node[px_key]) * scale_value
         scale_component_local_geometry(node, sx, sy)
         for collection_key in ("notches", "overlays", "vertical_bands"):
             for item in node.get(collection_key, []) or []:
@@ -3112,6 +3121,126 @@ def draw_polyline_wave(page: Any, page_height: float, node: dict[str, Any], styl
     return draw_single_path(page, page_height, points, line_style, "polyline")
 
 
+def ribbon_box_points(node: dict[str, Any], style: dict[str, Any]) -> list[tuple[float, float]]:
+    x = float(node["x"])
+    y = float(node["y"])
+    width = float(node["w"])
+    height = float(node["h"])
+    direction = str(node.get("direction", style.get("direction", "right"))).lower()
+    cx = x + width / 2
+    cy = y + height / 2
+
+    if direction in {"up", "top", "north", "n", "down", "bottom", "south", "s"}:
+        body_width = min(max(float(node.get("body_width_in", style.get("body_width_in", width * 0.42)) or width * 0.42), 0.01), width)
+        head_width = min(max(float(node.get("head_width_in", style.get("head_width_in", width * 0.92)) or width * 0.92), body_width), width)
+        head_length = min(max(float(node.get("head_length_in", style.get("head_length_in", min(height * 0.34, width * 0.92))) or min(height * 0.34, width * 0.92)), 0.01), height * 0.85)
+        if direction in {"up", "top", "north", "n"}:
+            return [
+                (cx - body_width / 2, y + height),
+                (cx - body_width / 2, y + head_length),
+                (cx - head_width / 2, y + head_length),
+                (cx, y),
+                (cx + head_width / 2, y + head_length),
+                (cx + body_width / 2, y + head_length),
+                (cx + body_width / 2, y + height),
+            ]
+        return [
+            (cx - body_width / 2, y),
+            (cx - body_width / 2, y + height - head_length),
+            (cx - head_width / 2, y + height - head_length),
+            (cx, y + height),
+            (cx + head_width / 2, y + height - head_length),
+            (cx + body_width / 2, y + height - head_length),
+            (cx + body_width / 2, y),
+        ]
+
+    body_width = min(max(float(node.get("body_width_in", style.get("body_width_in", height * 0.42)) or height * 0.42), 0.01), height)
+    head_width = min(max(float(node.get("head_width_in", style.get("head_width_in", height * 0.92)) or height * 0.92), body_width), height)
+    head_length = min(max(float(node.get("head_length_in", style.get("head_length_in", min(width * 0.34, height * 0.92))) or min(width * 0.34, height * 0.92)), 0.01), width * 0.85)
+    if direction in {"left", "west", "w"}:
+        return [
+            (x + width, cy - body_width / 2),
+            (x + head_length, cy - body_width / 2),
+            (x + head_length, cy - head_width / 2),
+            (x, cy),
+            (x + head_length, cy + head_width / 2),
+            (x + head_length, cy + body_width / 2),
+            (x + width, cy + body_width / 2),
+        ]
+    return [
+        (x, cy - body_width / 2),
+        (x + width - head_length, cy - body_width / 2),
+        (x + width - head_length, cy - head_width / 2),
+        (x + width, cy),
+        (x + width - head_length, cy + head_width / 2),
+        (x + width - head_length, cy + body_width / 2),
+        (x, cy + body_width / 2),
+    ]
+
+
+def node_path_points(node: dict[str, Any]) -> list[tuple[float, float]]:
+    raw_points = node.get("points")
+    if isinstance(raw_points, list) and len(raw_points) >= 2:
+        points: list[tuple[float, float]] = []
+        for point in raw_points:
+            if isinstance(point, list) and len(point) == 2:
+                points.append((float(point[0]), float(point[1])))
+        if len(points) >= 2:
+            return points
+    x = float(node["x"])
+    y = float(node["y"])
+    width = float(node["w"])
+    height = float(node["h"])
+    return [(x, y + height / 2), (x + width, y + height / 2)]
+
+
+def loop_ribbon_points(node: dict[str, Any]) -> list[tuple[float, float]]:
+    x = float(node["x"])
+    y = float(node["y"])
+    width = float(node["w"])
+    height = float(node["h"])
+    cx = x + width / 2
+    cy = y + height / 2
+    start_deg = float(node.get("start_angle_deg", 205))
+    sweep_deg = float(node.get("sweep_angle_deg", 300))
+    samples = max(8, int(node.get("smooth_samples", node.get("samples", 28)) or 28))
+    return [
+        (
+            cx + math.cos(math.radians(start_deg + sweep_deg * index / samples)) * width / 2,
+            cy + math.sin(math.radians(start_deg + sweep_deg * index / samples)) * height / 2,
+        )
+        for index in range(samples + 1)
+    ]
+
+
+def draw_ribbon_arrow(page: Any, page_height: float, node: dict[str, Any], style: dict[str, Any], mode: str) -> Any:
+    if mode == "ribbon_arrow":
+        shape = draw_polygon_from_points(page, page_height, ribbon_box_points(node, style))
+        fill = node.get("fill", style.get("fill", "#2E88B5"))
+        ribbon_style = merge_style(style, {"fill": fill, "line": node.get("line", style.get("line", fill))})
+        apply_style(shape, ribbon_style)
+        return shape
+
+    points = loop_ribbon_points(node) if mode == "loop_ribbon_arrow" else node_path_points(node)
+    if len(points) < 2:
+        raise ValueError(f"{mode} node `{node.get('id', '<unknown>')}` requires at least two points.")
+    body_width = float(node.get("body_width_in", node.get("ribbon_width_in", style.get("body_width_in", style.get("ribbon_width_in", 0.16)))) or 0.16)
+    line_style = merge_style(
+        style,
+        {
+            "fill": "none",
+            "line": node.get("fill", node.get("line", style.get("fill", style.get("line", "#2E88B5")))),
+            "line_weight_pt": body_width * 72.0,
+            "end_arrow": node.get("end_arrow", style.get("end_arrow", "triangle")),
+            "arrow_size": node.get("arrow_size", style.get("arrow_size", "xlarge")),
+        },
+    )
+    curve_mode = str(node.get("curve_mode", style.get("curve_mode", "smooth"))).lower()
+    if curve_mode in {"", "auto"}:
+        curve_mode = "smooth"
+    return draw_single_path(page, page_height, points, line_style, curve_mode)
+
+
 def draw_cell_strip(page: Any, page_height: float, node: dict[str, Any], style: dict[str, Any]) -> Any:
     x = float(node["x"])
     y = float(node["y"])
@@ -5794,6 +5923,8 @@ def draw_node(
             shape = draw_micro_grid(page, page_height, node, style)
         elif render_kind == "polyline_wave":
             shape = draw_polyline_wave(page, page_height, node, style)
+        elif render_kind in {"ribbon_arrow", "curved_ribbon_arrow", "loop_ribbon_arrow"}:
+            shape = draw_ribbon_arrow(page, page_height, node, style, render_kind)
         elif render_kind == "primitive_group":
             shape = draw_primitive_group(page, page_height, node, style)
         elif render_kind == "symbol_group":
@@ -5816,6 +5947,9 @@ def draw_node(
         "cell_strip",
         "micro_grid",
         "polyline_wave",
+        "ribbon_arrow",
+        "curved_ribbon_arrow",
+        "loop_ribbon_arrow",
         "primitive_group",
         "symbol_group",
         "classifier_head",
@@ -5848,6 +5982,9 @@ def draw_node(
         "cell_strip",
         "micro_grid",
         "polyline_wave",
+        "ribbon_arrow",
+        "curved_ribbon_arrow",
+        "loop_ribbon_arrow",
         "primitive_group",
         "symbol_group",
         "classifier_head",
@@ -6347,6 +6484,83 @@ def run_rebuild_gate(scene_path: Path) -> None:
                 )
 
 
+LAYER_Z_DEFAULTS = {
+    "background": -1000,
+    "panel": -500,
+    "arrow_under_text": -100,
+    "icon": 0,
+    "text": 100,
+    "foreground_arrow": 200,
+}
+
+
+def render_layer_z(item: dict[str, Any], default_z: float) -> float:
+    if isinstance(item.get("z"), (int, float)):
+        return float(item["z"])
+    layer = str(item.get("layer", "")).strip().lower()
+    if layer in LAYER_Z_DEFAULTS:
+        return float(LAYER_Z_DEFAULTS[layer])
+    style = item.get("style")
+    if isinstance(style, dict):
+        style_layer = str(style.get("layer", "")).strip().lower()
+        if style_layer in LAYER_Z_DEFAULTS:
+            return float(LAYER_Z_DEFAULTS[style_layer])
+    return default_z
+
+
+def node_default_z(node: dict[str, Any]) -> float:
+    node_type = str(node.get("type", ""))
+    if node_type == "page_background":
+        return float(LAYER_Z_DEFAULTS["background"])
+    if node_type in {"group_container", "dashed_region", "audit_region"}:
+        return float(LAYER_Z_DEFAULTS["panel"])
+    if node_type in {"text_block", "annotation_block", "caption_block", "math_text", "formula_text_block"}:
+        return float(LAYER_Z_DEFAULTS["text"])
+    if node_type in {"ribbon_arrow", "curved_ribbon_arrow", "loop_ribbon_arrow"}:
+        return float(LAYER_Z_DEFAULTS["arrow_under_text"])
+    return 0.0
+
+
+def edge_default_z(edge: dict[str, Any]) -> float:
+    layer = str(edge.get("layer", "")).strip().lower()
+    if layer in LAYER_Z_DEFAULTS:
+        return float(LAYER_Z_DEFAULTS[layer])
+    return 100.0
+
+
+def render_queue_entries(scene: dict[str, Any]) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    order = 0
+    for node in scene.get("nodes", []) or []:
+        if not isinstance(node, dict):
+            continue
+        entries.append({"kind": "node", "item": node, "sort_z": render_layer_z(node, node_default_z(node)), "order": order})
+        order += 1
+    for edge in scene.get("edges", []) or []:
+        if not isinstance(edge, dict):
+            continue
+        edge_z = render_layer_z(edge, edge_default_z(edge))
+        entries.append({"kind": "edge", "item": edge, "sort_z": edge_z, "order": order})
+        order += 1
+        if edge.get("label"):
+            label_entry = {
+                "kind": "edge_label",
+                "item": edge,
+                "sort_z": render_layer_z(
+                    {
+                        "z": edge.get("label_z"),
+                        "layer": edge.get("label_layer", "text"),
+                        "style": edge.get("label_style", {}),
+                    },
+                    float(LAYER_Z_DEFAULTS["text"]),
+                ),
+                "order": order,
+            }
+            entries.append(label_entry)
+            order += 1
+    return sorted(entries, key=lambda entry: (entry["sort_z"], entry["order"]))
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render a visiomaster scene.json into Visio.")
     parser.add_argument("scene", help="Path to scene.json")
@@ -6441,14 +6655,15 @@ def main() -> int:
         if asset.get("path")
     }
 
-    for node in sorted(scene.get("nodes", []), key=lambda item: item.get("z", 0)):
-        draw_node(page, page_height, node, asset_paths, component_map, profile, masters)
-
-    for edge in sorted(scene.get("edges", []), key=lambda item: item.get("z", 100)):
-        _, mid_x, mid_y = draw_edge(page, page_height, edge, nodes_by_id, component_map, profile)
-        if edge.get("label"):
-            route_points = edge_route_points(edge, edge_style(edge, component_map, profile), nodes_by_id)
-            draw_edge_label_for_edge(page, page_height, edge, route_points, profile)
+    for entry in render_queue_entries(scene):
+        item = entry["item"]
+        if entry["kind"] == "node":
+            draw_node(page, page_height, item, asset_paths, component_map, profile, masters)
+        elif entry["kind"] == "edge":
+            draw_edge(page, page_height, item, nodes_by_id, component_map, profile)
+        elif entry["kind"] == "edge_label":
+            route_points = edge_route_points(item, edge_style(item, component_map, profile), nodes_by_id)
+            draw_edge_label_for_edge(page, page_height, item, route_points, profile)
 
     basename = args.basename or scene_path.stem
     vsdx_path = output_dir / f"{basename}.vsdx"

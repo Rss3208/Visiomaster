@@ -28,10 +28,12 @@ ASPECT_RATIO_TOLERANCE = 0.08
 CONTAINER_TYPES = {"group_container", "dashed_region", "loss_region", "audit_region"}
 CURVED_EDGE_TYPES = {"curved_arrow", "loop_arrow"}
 CONTINUOUS_PATH_EDGE_TYPES = {"curved_arrow", "loop_arrow", "dashed_feedback_path"}
-VISUAL_GRAMMAR_NODE_TYPES = {"primitive_group", "shape_cluster", "symbol_group", "cell_strip", "micro_grid", "polyline_wave"}
+RIBBON_ARROW_NODE_TYPES = {"ribbon_arrow", "curved_ribbon_arrow", "loop_ribbon_arrow", "qualitative_change_arrow"}
+VISUAL_GRAMMAR_NODE_TYPES = {"primitive_group", "shape_cluster", "symbol_group", "cell_strip", "micro_grid", "polyline_wave", *RIBBON_ARROW_NODE_TYPES}
 PRIMITIVE_FAMILIES = {
     "cell_strip",
     "polyline_wave",
+    "ribbon_arrow",
     "symbol_group",
     "shape_cluster",
     "primitive_group",
@@ -881,6 +883,22 @@ def visual_grammar_node_findings(
         errors.append(f"Node `{node_id}` motif_binding must be a string.")
     if node.get("subshape_role") is not None and not isinstance(node.get("subshape_role"), str):
         errors.append(f"Node `{node_id}` subshape_role must be a string.")
+    obligations = node.get("fidelity_obligations")
+    if obligations is not None and not isinstance(obligations, list):
+        errors.append(f"Node `{node_id}` fidelity_obligations must be an array.")
+    if isinstance(obligations, list):
+        for index, obligation in enumerate(obligations):
+            if not isinstance(obligation, dict):
+                errors.append(f"Node `{node_id}` fidelity_obligations[{index}] must be an object.")
+                continue
+            if not str(obligation.get("object", "")).strip():
+                issue(f"Node `{node_id}` fidelity_obligations[{index}] should name the source object.")
+            for key in ("must_preserve", "allowed_simplification", "forbidden_simplification"):
+                value = obligation.get(key)
+                if value is not None and not isinstance(value, list):
+                    errors.append(f"Node `{node_id}` fidelity_obligations[{index}].{key} must be an array.")
+            if exact_mode and not obligation.get("must_preserve"):
+                issue(f"Node `{node_id}` fidelity_obligations[{index}] should list must_preserve details.")
 
     if node_type not in VISUAL_GRAMMAR_NODE_TYPES:
         return warnings, errors
@@ -958,6 +976,28 @@ def visual_grammar_node_findings(
                         errors.append(f"polyline_wave `{node_id}` points[{index}] must be [x, y] numbers.")
         if samples is not None and not has_samples:
             errors.append(f"polyline_wave `{node_id}` samples must contain at least two numeric values.")
+
+    if node_type in RIBBON_ARROW_NODE_TYPES:
+        if node_type in {"curved_ribbon_arrow", "loop_ribbon_arrow"}:
+            points = node.get("points")
+            if node_type == "curved_ribbon_arrow" and (not isinstance(points, list) or len(points) < 2):
+                issue(f"{node_type} `{node_id}` should provide source-sampled points; otherwise it may become a generic smooth band.")
+            if node_type == "loop_ribbon_arrow" and not (isinstance(points, list) and len(points) >= 3) and not all(
+                key in node for key in ("start_angle_deg", "sweep_angle_deg")
+            ):
+                issue(f"{node_type} `{node_id}` should provide points or start_angle_deg/sweep_angle_deg to lock the visible loop arc.")
+        if node_type in {"ribbon_arrow", "qualitative_change_arrow"}:
+            direction = str(node.get("direction", "")).lower()
+            if direction and direction not in {"right", "left", "up", "down", "east", "west", "north", "south", "n", "s", "e", "w", "top", "bottom"}:
+                errors.append(f"{node_type} `{node_id}` direction `{direction}` is unsupported.")
+        for key in ("body_width_in", "body_width_px", "head_width_in", "head_width_px", "head_length_in", "head_length_px"):
+            value = node.get(key)
+            if value is not None and (not isinstance(value, (int, float)) or float(value) <= 0):
+                errors.append(f"{node_type} `{node_id}` {key} must be a positive number.")
+        if exact_mode and "ribbon" in fact_text and not any(
+            node.get(key) is not None for key in ("body_width_in", "body_width_px", "head_width_in", "head_width_px")
+        ):
+            issue(f"{node_type} `{node_id}` records a ribbon/thick-arrow source fact but has no explicit body/head width.")
 
     if node_type in {"primitive_group", "shape_cluster", "symbol_group"}:
         subshapes = node.get("subshapes", node.get("parts", node.get("primitives")))
@@ -1724,6 +1764,30 @@ def validate_fidelity_metadata(
                         contract_issue(
                             f"metadata.source_visual_inventory.regions[{index}].{key} should be an array of source-visible style facts."
                         )
+                obligations = region.get("fidelity_obligations")
+                if obligations is not None and not isinstance(obligations, list):
+                    contract_issue(f"metadata.source_visual_inventory.regions[{index}].fidelity_obligations should be an array.")
+                if isinstance(obligations, list):
+                    for obligation_index, obligation in enumerate(obligations):
+                        if not isinstance(obligation, dict):
+                            contract_issue(
+                                f"metadata.source_visual_inventory.regions[{index}].fidelity_obligations[{obligation_index}] should be an object."
+                            )
+                            continue
+                        if not str(obligation.get("object", "")).strip():
+                            contract_issue(
+                                f"metadata.source_visual_inventory.regions[{index}].fidelity_obligations[{obligation_index}] needs an object name."
+                            )
+                        for obligation_key in ("must_preserve", "allowed_simplification", "forbidden_simplification"):
+                            value = obligation.get(obligation_key)
+                            if value is not None and not isinstance(value, list):
+                                contract_issue(
+                                    f"metadata.source_visual_inventory.regions[{index}].fidelity_obligations[{obligation_index}].{obligation_key} should be an array."
+                                )
+                        if not obligation.get("must_preserve"):
+                            contract_issue(
+                                f"metadata.source_visual_inventory.regions[{index}].fidelity_obligations[{obligation_index}] should list must_preserve details."
+                            )
                 crop_targets = region.get("required_crop_types")
                 if crop_targets is not None and not isinstance(crop_targets, list):
                     contract_issue(
@@ -2019,6 +2083,7 @@ def validate_arrow_plan_contract(
 
     edges_by_plan: dict[str, list[dict[str, Any]]] = {}
     motif_edges_by_plan: dict[str, list[dict[str, Any]]] = {}
+    ribbon_nodes_by_plan: dict[str, list[dict[str, Any]]] = {}
     unplanned_edges: list[str] = []
     for edge in edges:
         if not isinstance(edge, dict):
@@ -2033,6 +2098,15 @@ def validate_arrow_plan_contract(
             unplanned_edges.append(edge_id)
 
     for node_id, node in nodes_by_id.items():
+        node_type = str(node.get("type", ""))
+        node_plan_id = edge_arrow_plan_id(node)
+        if node_plan_id:
+            if node_type in RIBBON_ARROW_NODE_TYPES:
+                ribbon_nodes_by_plan.setdefault(node_plan_id, []).append(node)
+            if node_plan_id not in plan_ids:
+                contract_issue(f"Node `{node_id}` references unknown arrow_plan_id `{node_plan_id}`.")
+        elif exact_mode and node_type in RIBBON_ARROW_NODE_TYPES:
+            contract_issue(f"Ribbon arrow node `{node_id}` has no arrow_plan_id; bind thick visible arrows to metadata.arrow_plan.")
         for motif_edge in node_motif_edges(node):
             motif_edge_id = str(motif_edge.get("id", f"{node_id}.motif_edge"))
             plan_id = edge_arrow_plan_id(motif_edge)
@@ -2044,8 +2118,8 @@ def validate_arrow_plan_contract(
                 contract_issue(f"Node `{node_id}` motif_edge `{motif_edge_id}` has no arrow_plan_id.")
 
     for plan_id in sorted(active_plan_ids):
-        if plan_id not in edges_by_plan and plan_id not in motif_edges_by_plan:
-            contract_issue(f"metadata.arrow_plan `{plan_id}` has no scene edge or motif_edge with matching `arrow_plan_id`.")
+        if plan_id not in edges_by_plan and plan_id not in motif_edges_by_plan and plan_id not in ribbon_nodes_by_plan:
+            contract_issue(f"metadata.arrow_plan `{plan_id}` has no scene edge, motif_edge, or ribbon arrow node with matching `arrow_plan_id`.")
 
     if exact_mode and plans and unplanned_edges:
         contract_issue(
@@ -2055,9 +2129,10 @@ def validate_arrow_plan_contract(
         )
 
     plan_by_id = {str(plan.get("id", "")).strip(): plan for plan in plans if isinstance(plan, dict)}
-    for plan_id in sorted(set(edges_by_plan) | set(motif_edges_by_plan)):
+    for plan_id in sorted(set(edges_by_plan) | set(motif_edges_by_plan) | set(ribbon_nodes_by_plan)):
         plan_edges = edges_by_plan.get(plan_id, [])
         motif_plan_edges = motif_edges_by_plan.get(plan_id, [])
+        ribbon_plan_nodes = ribbon_nodes_by_plan.get(plan_id, [])
         plan = plan_by_id.get(plan_id)
         if not plan:
             continue
@@ -2088,6 +2163,15 @@ def validate_arrow_plan_contract(
                 )
         intent = str(plan.get("semantic_intent", plan.get("intent", ""))).lower()
         route_shape = str(plan.get("route_shape", plan.get("shape", ""))).lower()
+        arrow_form_text = recursive_fact_text(
+            {
+                "visual_form": plan.get("visual_form", plan.get("arrow_form")),
+                "line_style": plan.get("line_style"),
+                "source_fact": plan.get("source_fact"),
+                "relative_position_facts": plan.get("relative_position_facts"),
+            }
+        )
+        plan_requires_ribbon = any(token in arrow_form_text for token in {"ribbon", "thick arrow", "filled arrow", "broad arrow", "band arrow"})
         from_anchor = plan.get("from_anchor", plan.get("source_anchor"))
         to_anchor = plan.get("to_anchor", plan.get("target_anchor"))
         must_axis = bool(plan.get("must_be_axis_aligned")) or route_shape in {
@@ -2115,9 +2199,21 @@ def validate_arrow_plan_contract(
             if not motif_edge.get("to") and not motif_edge.get("to_anchor_description"):
                 contract_issue(f"Arrow plan `{plan_id}` motif_edge `{motif_edge_id}` should declare an internal target/to endpoint.")
 
+        for ribbon_node in ribbon_plan_nodes:
+            ribbon_node_id = str(ribbon_node.get("id", "<ribbon-node>"))
+            ribbon_type = str(ribbon_node.get("type", ""))
+            if plan_requires_ribbon and ribbon_type not in RIBBON_ARROW_NODE_TYPES:
+                contract_issue(f"Arrow plan `{plan_id}` requires a ribbon/thick arrow but node `{ribbon_node_id}` uses `{ribbon_type}`.")
+            if route_shape in {"curved", "smooth_curve"} and ribbon_type not in {"curved_ribbon_arrow"}:
+                contract_issue(f"Arrow plan `{plan_id}` expects a curved ribbon arrow but node `{ribbon_node_id}` uses `{ribbon_type}`.")
+            if route_shape == "loop" and ribbon_type not in {"loop_ribbon_arrow"}:
+                contract_issue(f"Arrow plan `{plan_id}` expects a loop ribbon arrow but node `{ribbon_node_id}` uses `{ribbon_type}`.")
+
         for edge in plan_edges:
             edge_id = str(edge.get("id", "<unknown>"))
             edge_type = str(edge.get("type", ""))
+            if plan_requires_ribbon:
+                contract_issue(f"Arrow plan `{plan_id}` requires a ribbon/thick arrow but edge `{edge_id}` uses thin connector `{edge_type}`; use a ribbon arrow node.")
             if intent in {"feedback", "loss_backprop"} and edge_type != "dashed_feedback_path":
                 contract_issue(f"Arrow plan `{plan_id}` is `{intent}` but edge `{edge_id}` uses `{edge_type}`; use `dashed_feedback_path`.")
             if intent in {"boundary_handoff", "frame_output"}:
@@ -3755,6 +3851,7 @@ def validate_scene(scene: dict, strict: bool = False) -> tuple[list[str], list[s
             "math_label_box",
             "math_text",
             "tfr_panel",
+            *RIBBON_ARROW_NODE_TYPES,
         }
         if strict and "text" not in node and "symbol" not in node and node_type not in no_text_ok_types:
             warnings.append(f"Node `{node_id}` has no `text`.")

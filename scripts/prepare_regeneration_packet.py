@@ -234,6 +234,9 @@ def main() -> int:
     visual_checklist = rebuild_brief.get("visual_checklist", [])
     if not isinstance(visual_checklist, list):
         visual_checklist = []
+    fidelity_checklist = rebuild_brief.get("fidelity_checklist", [])
+    if not isinstance(fidelity_checklist, list):
+        fidelity_checklist = []
     checklist_validation = rebuild_brief.get("checklist_validation", {})
     if not isinstance(checklist_validation, dict):
         checklist_validation = {}
@@ -259,6 +262,7 @@ def main() -> int:
         "rebuild_focus_regions": rebuild_brief.get("rebuild_focus_regions", []),
         "topology_checklist": topology_checklist,
         "visual_checklist": visual_checklist,
+        "fidelity_checklist": fidelity_checklist,
         "checklist_validation": checklist_validation,
         "findings_digest": findings_digest,
         "arrow_plan_repair_targets": arrow_plan_repair_targets,
@@ -275,7 +279,7 @@ def main() -> int:
         "execution_contract": [
             "Use the original image and current replica image as the primary visual evidence.",
             "Use structured review findings to author a brand-new full scene.",
-            "Use topology_checklist, visual_checklist, and arrow_plan_repair_targets as explicit regeneration inputs.",
+            "Use topology_checklist, visual_checklist, fidelity_checklist, and arrow_plan_repair_targets as explicit regeneration inputs.",
             "For cited arrow ids, repair the mapped scene_edge_ids or motif_bindings rather than relying on broad natural-language arrow notes.",
             "Do not patch or copy prior-scene geometry.",
             "Render the new scene and pass it through the no-op gate before claiming a new round.",
@@ -322,6 +326,8 @@ def main() -> int:
             checklist_section("Topology Checklist", [item for item in topology_checklist if isinstance(item, dict)]).rstrip(),
             "",
             checklist_section("Visual Checklist", [item for item in visual_checklist if isinstance(item, dict)]).rstrip(),
+            "",
+            checklist_section("Fidelity Checklist", [item for item in fidelity_checklist if isinstance(item, dict)]).rstrip(),
             "",
             checklist_validation_section(checklist_validation).rstrip(),
             "",

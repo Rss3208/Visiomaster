@@ -1,0 +1,153 @@
+{
+  "version": "0.1",
+  "page": {
+    "width": 8,
+    "height": 4.5,
+    "units": "in",
+    "origin": "top-left"
+  },
+  "assets": [],
+  "metadata": {
+    "title": "Ribbon arrow layering smoke test",
+    "fidelity": "exact",
+    "replica_review_mode": "strict_replica",
+    "replica_stage": "layout_topology",
+    "source_aspect_ratio": 1.7777777778,
+    "source_visual_inventory": {
+      "analysis_basis": "visual_llm_source_image",
+      "do_not_translate": true,
+      "unknown_text_policy": "mark_unreadable_do_not_invent",
+      "scene_authoring_mode": "fresh_from_source_inventory",
+      "prior_scene_policy": "do_not_patch_prior_scene",
+      "regions": [
+        {
+          "id": "global",
+          "source_bbox_px": [0, 0, 1600, 900],
+          "required_crop_types": ["global"],
+          "required_labels": ["Center Label"],
+          "text_layout_facts": ["center label sits above ribbon"],
+          "line_style_facts": ["thick filled ribbon arrow"],
+          "box_style_facts": ["white background"],
+          "density_facts": ["sparse"]
+        },
+        {
+          "id": "input",
+          "source_bbox_px": [100, 260, 450, 640],
+          "required_crop_types": ["input"],
+          "required_labels": ["Input"],
+          "text_layout_facts": ["input side remains left of arrow body"],
+          "line_style_facts": ["arrow begins after input side"],
+          "box_style_facts": ["plain text"],
+          "density_facts": ["sparse"]
+        },
+        {
+          "id": "core",
+          "source_bbox_px": [450, 260, 1150, 640],
+          "required_crop_types": ["core", "arrow_dense", "small_text"],
+          "required_component_motifs": ["ribbon arrow behind text"],
+          "required_edge_motifs": ["A001 rightward thick arrow"],
+          "text_layout_facts": ["label is readable and not crossed by arrow"],
+          "line_style_facts": ["filled arrow body and wide head"],
+          "box_style_facts": ["low visual clutter"],
+          "density_facts": ["sparse"],
+          "fidelity_obligations": [
+            {
+              "object": "center_ribbon_arrow",
+              "must_preserve": ["filled body", "wide triangular head", "rightward direction"],
+              "allowed_simplification": ["flat fill instead of gradient"],
+              "forbidden_simplification": ["thin connector line"]
+            }
+          ]
+        },
+        {
+          "id": "output",
+          "source_bbox_px": [1150, 260, 1500, 640],
+          "required_crop_types": ["output"],
+          "required_labels": ["Output"],
+          "text_layout_facts": ["output label remains right of arrow head"],
+          "line_style_facts": ["arrow points to output"],
+          "box_style_facts": ["plain text"],
+          "density_facts": ["sparse"]
+        }
+      ]
+    },
+    "visual_grammar_inventory": {
+      "shape_facts": ["plain white page", "text above broad arrow"],
+      "cell_facts": [],
+      "line_facts": ["thick ribbon arrow", "arrow under text"],
+      "symbol_facts": [],
+      "wave_facts": [],
+      "text_facts": ["single-line centered label"]
+    },
+    "arrow_plan": [
+      {
+        "id": "A001",
+        "from_visual_object": "left ribbon body",
+        "from_anchor_description": "left body midpoint",
+        "to_visual_object": "right arrow head",
+        "to_anchor_description": "right point",
+        "from": "left ribbon body",
+        "to": "right arrow head",
+        "direction": "left_to_right",
+        "route_shape": "straight_horizontal",
+        "line_style": "thick filled ribbon arrow",
+        "visual_form": "ribbon arrow",
+        "arrowhead": "filled head",
+        "semantic_intent": "data_flow",
+        "source_bbox_px": [320, 390, 1280, 520],
+        "must_not_cross": ["Center Label"],
+        "relative_position_facts": ["text label sits above the arrow body"],
+        "certainty": "certain"
+      }
+    ],
+    "region_plan": [
+      {"id": "global", "source_bbox_px": [0, 0, 1600, 900], "target_bbox": [0, 0, 8, 4.5], "crop_type": "global"},
+      {"id": "input", "source_bbox_px": [100, 260, 450, 640], "target_bbox": [0.5, 1.3, 1.75, 1.9], "crop_type": "input"},
+      {"id": "core", "source_bbox_px": [450, 260, 1150, 640], "target_bbox": [2.25, 1.3, 3.5, 1.9], "crop_type": "core arrow_dense small_text"},
+      {"id": "output", "source_bbox_px": [1150, 260, 1500, 640], "target_bbox": [5.75, 1.3, 7.5, 3.2], "crop_type": "output"}
+    ]
+  },
+  "nodes": [
+    {"id": "bg", "type": "page_background", "x": 0, "y": 0, "w": 8, "h": 4.5, "z": -1000},
+    {
+      "id": "ribbon",
+      "type": "ribbon_arrow",
+      "arrow_plan_id": "A001",
+      "x": 1.25,
+      "y": 1.82,
+      "w": 5.6,
+      "h": 0.72,
+      "direction": "right",
+      "body_width_in": 0.22,
+      "head_width_in": 0.62,
+      "head_length_in": 0.55,
+      "fill": "#2E88B5",
+      "layer": "arrow_under_text",
+      "source_bbox_px": [320, 390, 1280, 520],
+      "must_match_facts": ["filled right arrow", "wide triangular head", "behind center label"]
+    },
+    {
+      "id": "center_label",
+      "type": "text_block",
+      "x": 3.05,
+      "y": 1.74,
+      "w": 1.9,
+      "h": 0.34,
+      "text": "Center Label",
+      "layer": "text",
+      "style": {"font_family": "Arial", "font_size_pt": 14, "min_font_size_pt": 11, "text_fit": "single_line", "fill": "none", "line": "none"}
+    },
+    {
+      "id": "output_label",
+      "type": "text_block",
+      "x": 6.72,
+      "y": 1.92,
+      "w": 0.8,
+      "h": 0.3,
+      "text": "Output",
+      "layer": "text",
+      "style": {"font_family": "Arial", "font_size_pt": 11, "min_font_size_pt": 9, "text_fit": "single_line", "fill": "none", "line": "none"}
+    }
+  ],
+  "edges": []
+}

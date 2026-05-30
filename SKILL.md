@@ -96,6 +96,7 @@ Record the inventory in `metadata.source_visual_inventory` before the first rend
 - `language_profile` and `do_not_translate`.
 - `unknown_text_policy`: use `mark_unreadable_do_not_invent` for unclear tiny text.
 - per-region `source_bbox_px`, required visible labels/formulas, component motifs, edge motifs, port/boundary/dashed-frame notes, uncertainty notes, and text layout facts.
+- per-region `fidelity_obligations` for details that must not be simplified away, with `object`, `must_preserve`, `allowed_simplification`, and `forbidden_simplification` fields.
 
 Before choosing components, add a mandatory `metadata.visual_grammar_inventory` pass. Components are rendering grammar, not recognition conclusions. The source visual facts decide the component parameters; components must not normalize source-specific variation into a standard template.
 
@@ -105,14 +106,22 @@ Record facts such as:
 "visual_grammar_inventory": {
   "shape_facts": ["thin rounded rectangle", "small filled circle", "outlined triangle"],
   "cell_facts": ["continuous rectangular cells", "5 columns", "low rounding", "thin grid line"],
-  "line_facts": ["solid horizontal", "dashed orthogonal", "arrowhead at end"],
+  "line_facts": ["solid horizontal", "dashed orthogonal", "arrowhead at end", "thick ribbon arrow"],
   "symbol_facts": ["circle plus", "triangle gate", "circular refresh arrow"],
   "wave_facts": ["polyline-like", "single peak", "noisy high frequency"],
   "text_facts": ["single-line math", "bold centered title", "small multiline label"]
 }
 ```
 
-Use this inventory to decide whether a source unit should become `cell_strip`, `micro_grid`, `polyline_wave`, `symbol_group`, `shape_cluster`, `primitive_group`, or a higher-level semantic component. If a higher-level component would change the recorded facts, for example rectangular cells becoming rounded tokens or a sampled waveform becoming a smooth sine, switch to a primitive instead.
+Use this inventory to decide whether a source unit should become `cell_strip`, `micro_grid`, `polyline_wave`, `symbol_group`, `shape_cluster`, `primitive_group`, `ribbon_arrow`, `curved_ribbon_arrow`, `loop_ribbon_arrow`, or a higher-level semantic component. If a higher-level component would change the recorded facts, for example rectangular cells becoming rounded tokens or a sampled waveform becoming a smooth sine, switch to a primitive instead.
+
+For source-visible thick arrows, do not normalize them into thin connectors:
+- straight filled arrows use `ribbon_arrow` or the `qualitative_change_arrow` preset
+- curved filled arrows use `curved_ribbon_arrow`
+- cycle/update arrows that look like thick loop graphics use `loop_ribbon_arrow`
+- record the required arrow body/head geometry in `must_match_facts`, and place broad ribbon arrows on `layer: "arrow_under_text"` unless the source visibly places them above labels
+
+Use rendering layers when arrows and text overlap in the source. `z` is unified across nodes, edges, and edge labels, so an edge with `layer: "arrow_under_text"` or a negative `z` can render behind labels. Use `foreground_arrow` only when the source visibly draws an arrow above other marks.
 
 Before authoring the first `edges` array for an exact replica, run a separate arrow-inventory pass from the source image. The goal is to lock topology before any Visio PNG exists. For arrow-dense local structures, this pass is not optional bookkeeping; it is the scene driver:
 - record every source-visible arrow in `metadata.arrow_plan`
@@ -308,6 +317,7 @@ For exact replicas, the first render is allowed to be a fast editable reconstruc
 - During review, convert source-vs-replica visual comparison into two explicit checklists inside or alongside `review_findings.json`: a topology checklist and a visual-layout checklist.
 - The topology checklist records source facts such as branches, merges, boundary crossings, operator order, arrow endpoints, and required routes. Examples: `S3 -> vertical trunk -> S1/common path`, `S2/S3 -> hollow circle -> minus`, `Linear -> f̂ -> [] -> fused feature`.
 - The visual-layout checklist records overlap, label wrapping, bracket/tensor spacing, line-through-text defects, feature-stack thickness, font-role drift, and color/rounding/shadow mismatches.
+- The fidelity-obligation checklist records "must not simplify" details from `fidelity_obligations`, such as worker limbs/helmets, crossed tools, neural-network node-link marks, ribbon-arrow body/head geometry, or dense icon internals.
 - A finding should reference the failed checklist item when possible. Do not write only broad notes such as "right output is wrong" when a specific missing branch, wrong landing point, or bracket overlap is visible.
 - Repair rounds must re-check the same crop and checklist items, not only rerun validation or no-op gates.
 
@@ -324,6 +334,8 @@ For exact/strict review packaging, call `make_review_assets.py --write-review-bu
 - `--crops core arrow_dense caption` for hand-picked named crops.
 - `--region-crops all` only when you intentionally want every `metadata.region_plan` crop pair.
 - `--include-overlays` only for alignment-drift debugging.
+
+The bundle also writes `<id>_human_review_checklist.md`. Use it as a human/visual-LLM navigation checklist for topology, visual grammar, and fidelity obligations; it is not a substitute for sending the original and replica images to a visual reviewer.
 
 The reviewer should receive the two images and a concrete issue format. It should report specific visual differences, source appearance, replica appearance, impact on fidelity, focus regions, and the expected visible change after regeneration. Use script output only to package round evidence and to validate/export; the quality decision remains visual.
 
@@ -342,6 +354,7 @@ Do not stop at natural-language review notes. In strict work, the review loop mu
 `review_findings.json` should contain both defect findings and the review checklists used to find them. At minimum, include:
 - `topology_checklist`: visible source topology facts, each with an id, focus region, source fact, replica status, and pass/fail/uncertain status.
 - `visual_checklist`: local layout/style facts, each with an id, focus region, source expectation, replica status, and pass/fail/uncertain status.
+- `fidelity_checklist`: source-object details from `fidelity_obligations`, especially forbidden simplifications.
 - findings that cite `checklist_refs` for failed checklist items when applicable.
 
 Use `uncertain` instead of inventing facts when a source crop is unclear. Ask for a higher-resolution source or user confirmation only when the uncertain item affects topology or final fidelity.
@@ -506,6 +519,10 @@ Supported node families:
 - `micro_grid`
 - `token_grid`
 - `polyline_wave`
+- `ribbon_arrow`
+- `curved_ribbon_arrow`
+- `loop_ribbon_arrow`
+- `qualitative_change_arrow`
 - `symbol_group`
 - `shape_cluster`
 - `primitive_group`
@@ -652,7 +669,7 @@ Why this matters:
 - `scripts/scene_complexity.py`: preflight report for large/dense figures before Visio rendering
 - `scripts/font_inventory.py`: local Windows font inventory and preferred role fallback check
 - `scripts/stage_source_image.py`: copies a source image into `source/original.<ext>` and records hashes for stable strict review manifests
-- `scripts/review_checklist_gate.py`: validates `topology_checklist`, `visual_checklist`, local source-image paths, and `checklist_refs` before rebuild planning
+- `scripts/review_checklist_gate.py`: validates `topology_checklist`, `visual_checklist`, `fidelity_checklist`, local source-image paths, and `checklist_refs` before rebuild planning
 - `scripts/scene_autofix.py`: deterministic GAN/TFR local grammar upgrade pass before Visio rendering
 - `docs/updates/2026-05-19-multimodal-paper-figure.md`: detailed analysis of a complex multimodal paper figure and the related component upgrade
 

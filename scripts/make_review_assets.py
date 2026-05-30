@@ -292,7 +292,18 @@ def visual_grammar_checklist(scene: dict[str, object] | None) -> list[dict[str, 
         if not isinstance(node, dict):
             continue
         node_type = str(node.get("type", ""))
-        if node_type not in {"primitive_group", "shape_cluster", "symbol_group", "cell_strip", "micro_grid", "polyline_wave"}:
+        if node_type not in {
+            "primitive_group",
+            "shape_cluster",
+            "symbol_group",
+            "cell_strip",
+            "micro_grid",
+            "polyline_wave",
+            "ribbon_arrow",
+            "curved_ribbon_arrow",
+            "loop_ribbon_arrow",
+            "qualitative_change_arrow",
+        }:
             continue
         facts = node.get("must_match_facts")
         if not isinstance(facts, list) or not facts:
@@ -318,6 +329,106 @@ def visual_grammar_checklist(scene: dict[str, object] | None) -> list[dict[str, 
     return items
 
 
+def fidelity_obligation_checklist(scene: dict[str, object] | None, start_index: int = 1) -> list[dict[str, object]]:
+    if not isinstance(scene, dict):
+        return []
+    items: list[dict[str, object]] = []
+    counter = start_index
+    metadata = scene.get("metadata", {}) if isinstance(scene.get("metadata"), dict) else {}
+    inventory = metadata.get("source_visual_inventory") if isinstance(metadata, dict) else None
+
+    def add_obligations(obligations: object, *, focus_region: object, source_bbox_px: object = None, node_id: object = None) -> None:
+        nonlocal counter
+        if not isinstance(obligations, list):
+            return
+        for obligation in obligations:
+            if not isinstance(obligation, dict):
+                continue
+            source_object = str(obligation.get("object", "source_object")).strip() or "source_object"
+            must_preserve = obligation.get("must_preserve")
+            forbidden = obligation.get("forbidden_simplification")
+            expected_parts = []
+            if isinstance(must_preserve, list) and must_preserve:
+                expected_parts.append("preserve " + ", ".join(str(item) for item in must_preserve))
+            if isinstance(forbidden, list) and forbidden:
+                expected_parts.append("must not simplify into " + ", ".join(str(item) for item in forbidden))
+            source_expectation = "; ".join(expected_parts) or f"preserve visible details of {source_object}"
+            items.append(
+                {
+                    "id": f"F{counter:03d}",
+                    "kind": "fidelity_obligation",
+                    "object": source_object,
+                    "node_id": node_id,
+                    "focus_region": focus_region,
+                    "source_bbox_px": source_bbox_px,
+                    "source_fact": source_expectation,
+                    "source_expectation": source_expectation,
+                    "replica_status": "not_reviewed",
+                    "repair_hint": "If violated, add a source-matched primitive/symbol/ribbon component instead of simplifying the object.",
+                    "status": "uncertain",
+                    "certainty": "certain",
+                }
+            )
+            counter += 1
+
+    if isinstance(inventory, dict):
+        regions = inventory.get("regions")
+        if isinstance(regions, list):
+            for region in regions:
+                if not isinstance(region, dict):
+                    continue
+                add_obligations(
+                    region.get("fidelity_obligations"),
+                    focus_region=region.get("id", region.get("name", "source_region")),
+                    source_bbox_px=region.get("source_bbox_px", region.get("source_bbox")),
+                )
+
+    nodes = scene.get("nodes", []) if isinstance(scene.get("nodes"), list) else []
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        add_obligations(
+            node.get("fidelity_obligations"),
+            focus_region=node.get("source_region_id", node.get("container_id", "local_node")),
+            source_bbox_px=node.get("source_bbox_px", node.get("source_bbox")),
+            node_id=node.get("id"),
+        )
+    return items
+
+
+def human_review_checklist_markdown(manifest: dict[str, object]) -> str:
+    lines = [
+        "# Human Review Checklist",
+        "",
+        f"- Figure: `{manifest.get('figure_id')}`",
+        f"- Round: `{manifest.get('round')}`",
+        f"- Original: `{manifest.get('original_path')}`",
+        f"- Replica: `{manifest.get('replica_path')}`",
+        "",
+        "Use this as a human/visual-LLM checklist. Passing this file does not replace two-image visual review.",
+        "",
+    ]
+    sections = (
+        ("Arrow Plan", manifest.get("arrow_plan_checklist")),
+        ("Visual Grammar", manifest.get("visual_checklist")),
+        ("Fidelity Obligations", manifest.get("fidelity_checklist")),
+    )
+    for title, raw_items in sections:
+        lines.extend([f"## {title}", ""])
+        if not isinstance(raw_items, list) or not raw_items:
+            lines.extend(["- [ ] No checklist items recorded.", ""])
+            continue
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            label = item.get("id", item.get("object", item.get("node_id", "item")))
+            focus = item.get("focus_region", item.get("node_id", "global"))
+            expectation = item.get("source_expectation", item.get("source_fact", "check source-matched appearance"))
+            lines.append(f"- [ ] `{label}` ({focus}): {expectation}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def review_bundle_payload(
     *,
     figure_id: str,
@@ -341,6 +452,7 @@ def review_bundle_payload(
     ]
     topology_checklist = arrow_plan_topology_checklist(scene)
     visual_checklist = visual_grammar_checklist(scene)
+    fidelity_checklist = fidelity_obligation_checklist(scene, start_index=1)
     manifest = {
         "schema_version": "0.1",
         "figure_id": figure_id,
@@ -357,6 +469,7 @@ def review_bundle_payload(
         "regions": region_rows,
         "arrow_plan_checklist": topology_checklist,
         "visual_checklist": visual_checklist,
+        "fidelity_checklist": fidelity_checklist,
         "debug_asset_policy": {
             "global_pair": "off_by_default; generate only with --include-global-pair for human navigation or audit records",
             "crops": "targeted_only; generate named crops with --crops or scene regions with --region-crops all",
@@ -398,6 +511,7 @@ def review_bundle_payload(
         "findings": [],
         "topology_checklist": topology_checklist,
         "visual_checklist": visual_checklist,
+        "fidelity_checklist": fidelity_checklist,
     }
     rebuild_template = {
         "schema_version": "0.1",
@@ -417,6 +531,7 @@ def review_bundle_payload(
         "findings_digest": [],
         "arrow_plan_repair_targets": [],
         "visual_grammar_repair_targets": [],
+        "fidelity_repair_targets": [],
     }
     return manifest, findings_template, rebuild_template
 
@@ -564,11 +679,14 @@ def main() -> int:
         manifest_path = out_dir / f"{args.id}_review_manifest.json"
         findings_path = out_dir / f"{args.id}_review_findings.template.json"
         rebuild_path = out_dir / f"{args.id}_scene_rebuild_brief.template.json"
+        checklist_path = out_dir / f"{args.id}_human_review_checklist.md"
         findings_template["review_manifest_path"] = str(manifest_path.resolve())
         rebuild_template["source_findings_path"] = str(findings_path.resolve())
+        manifest["human_review_checklist_path"] = str(checklist_path.resolve())
         write_json(manifest_path, manifest)
         write_json(findings_path, findings_template)
         write_json(rebuild_path, rebuild_template)
+        checklist_path.write_text(human_review_checklist_markdown(manifest), encoding="utf-8")
     print(f"Wrote review assets to {out_dir}")
     return 0
 
