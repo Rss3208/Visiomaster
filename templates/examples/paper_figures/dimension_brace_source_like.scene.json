@@ -1,0 +1,187 @@
+{
+  "version": "0.1",
+  "metadata": {
+    "title": "Source-like TeX stretch dimension brace examples",
+    "style_profile": "paper_white",
+    "notes": [
+      "Tests dimension_brace against paper figures where a vertical stack or column is annotated by a TeX-like stretch delimiter.",
+      "The brace should have short curled terminals, long near-vertical stems, and a small waist pinch."
+    ],
+    "visual_grammar_inventory": {
+      "shape_facts": [
+        {
+          "role": "dimension_brace",
+          "form": "TeX-like stretch brace",
+          "must_render_as": ["long near-vertical stems", "small waist pinch", "short curled terminals"],
+          "must_not_render_as": ["S-shaped wave", "ordinary decorative curly brace", "Unicode brace glyph", "raster image"]
+        }
+      ],
+      "cell_facts": ["vertical stack and vertical latent column used as brace targets"],
+      "line_facts": ["brace has no arrows and no tick marks"],
+      "symbol_facts": [],
+      "wave_facts": [],
+      "text_facts": ["labels sit beside the brace waist without being part of the brace geometry"]
+    }
+  },
+  "page": {
+    "width": 760,
+    "height": 500,
+    "units": "px",
+    "origin": "top-left",
+    "target_width_in": 7.6,
+    "background": "#FFFFFF"
+  },
+  "assets": [],
+  "nodes": [
+    {
+      "id": "page_background",
+      "type": "page_background",
+      "x": 0,
+      "y": 0,
+      "w": 760,
+      "h": 500,
+      "z": -100
+    },
+    {
+      "id": "stack_top",
+      "type": "cell_strip",
+      "x": 110,
+      "y": 58,
+      "w": 58,
+      "h": 96,
+      "orientation": "vertical",
+      "rows": 4,
+      "cols": 1,
+      "cells": [{"fill": "#DCCDF7"}, {"fill": "#DCCDF7"}, {"fill": "#DCCDF7"}, {"fill": "#DCCDF7"}],
+      "style": {"cell_line": "#111111", "cell_line_weight_pt": 0.8, "cell_gap_in": 0, "line": "#111111"}
+    },
+    {
+      "id": "stack_mid",
+      "type": "cell_strip",
+      "x": 110,
+      "y": 154,
+      "w": 58,
+      "h": 120,
+      "orientation": "vertical",
+      "rows": 5,
+      "cols": 1,
+      "cells": [{"fill": "#CFE4F5"}, {"fill": "#CFE4F5"}, {"fill": "#CFE4F5"}, {"fill": "#CFE4F5"}, {"fill": "#CFE4F5"}],
+      "style": {"cell_line": "#111111", "cell_line_weight_pt": 0.8, "cell_gap_in": 0, "line": "#111111"}
+    },
+    {
+      "id": "stack_bottom",
+      "type": "cell_strip",
+      "x": 110,
+      "y": 274,
+      "w": 58,
+      "h": 110,
+      "orientation": "vertical",
+      "rows": 4,
+      "cols": 1,
+      "cells": [{"fill": "#DDEFCF"}, {"fill": "#DDEFCF"}, {"fill": "#DDEFCF"}, {"fill": "#DDEFCF"}],
+      "style": {"cell_line": "#111111", "cell_line_weight_pt": 0.8, "cell_gap_in": 0, "line": "#111111"}
+    },
+    {
+      "id": "brace_top",
+      "type": "dimension_brace",
+      "x": 176,
+      "y": 58,
+      "w": 13,
+      "h": 96,
+      "orientation": "right",
+      "style": {"line": "#111111", "line_weight_pt": 1.05},
+      "source_visual_facts": {"shape": "right-side TeX-like stretch dimension brace", "opens_toward": "left"},
+      "must_match_facts": ["long near-vertical stems", "small waist pinch", "short curled terminals", "not S-shaped"]
+    },
+    {
+      "id": "brace_mid",
+      "type": "dimension_brace",
+      "x": 176,
+      "y": 154,
+      "w": 13,
+      "h": 120,
+      "orientation": "right",
+      "style": {"line": "#111111", "line_weight_pt": 1.05},
+      "source_visual_facts": {"shape": "right-side TeX-like stretch dimension brace", "opens_toward": "left"},
+      "must_match_facts": ["long near-vertical stems", "small waist pinch", "short curled terminals", "not S-shaped"]
+    },
+    {
+      "id": "brace_bottom",
+      "type": "dimension_brace",
+      "x": 176,
+      "y": 274,
+      "w": 13,
+      "h": 110,
+      "orientation": "right",
+      "style": {"line": "#111111", "line_weight_pt": 1.05},
+      "source_visual_facts": {"shape": "right-side TeX-like stretch dimension brace", "opens_toward": "left"},
+      "must_match_facts": ["long near-vertical stems", "small waist pinch", "short curled terminals", "not S-shaped"]
+    },
+    {
+      "id": "label_a",
+      "type": "text_block",
+      "x": 198,
+      "y": 98,
+      "w": 44,
+      "h": 44,
+      "text": "A",
+      "style": {"line": "none", "fill": "none", "font_family": "Times New Roman", "font_size_pt": 18, "font_italic": true}
+    },
+    {
+      "id": "label_b",
+      "type": "text_block",
+      "x": 198,
+      "y": 202,
+      "w": 44,
+      "h": 44,
+      "text": "B",
+      "style": {"line": "none", "fill": "none", "font_family": "Times New Roman", "font_size_pt": 18, "font_italic": true}
+    },
+    {
+      "id": "label_c",
+      "type": "text_block",
+      "x": 198,
+      "y": 314,
+      "w": 44,
+      "h": 44,
+      "text": "C",
+      "style": {"line": "none", "fill": "none", "font_family": "Times New Roman", "font_size_pt": 18, "font_italic": true}
+    },
+    {
+      "id": "latent_col",
+      "type": "cell_strip",
+      "x": 485,
+      "y": 64,
+      "w": 36,
+      "h": 300,
+      "orientation": "vertical",
+      "rows": 7,
+      "cols": 1,
+      "cells": [{"fill": "#FFF4CE"}, {"fill": "#FFF4CE"}, {"fill": "#FFF4CE"}, {"fill": "#FFF4CE"}, {"fill": "#FFF4CE"}, {"fill": "#FFF4CE"}, {"fill": "#FFF4CE"}],
+      "style": {"cell_line": "#111111", "cell_line_weight_pt": 0.8, "cell_gap_in": 0, "line": "#111111"}
+    },
+    {
+      "id": "brace_m",
+      "type": "dimension_brace",
+      "x": 454,
+      "y": 64,
+      "w": 16,
+      "h": 300,
+      "orientation": "left",
+      "style": {"line": "#111111", "line_weight_pt": 1.05},
+      "source_visual_facts": {"shape": "left-side TeX-like stretch dimension brace", "opens_toward": "right"},
+      "must_match_facts": ["long near-vertical stems", "small waist pinch", "short curled terminals", "not S-shaped"]
+    },
+    {
+      "id": "label_m",
+      "type": "text_block",
+      "x": 410,
+      "y": 198,
+      "w": 38,
+      "h": 46,
+      "text": "m",
+      "style": {"line": "none", "fill": "none", "font_family": "Times New Roman", "font_size_pt": 20, "font_italic": true}
+    }
+  ],
+  "edges": []
+}

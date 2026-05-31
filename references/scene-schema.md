@@ -1737,7 +1737,7 @@ Set `shape: "curly"` for legacy/general brace-like aggregation marks. Use the de
 
 ### `dimension_brace`
 
-Use `dimension_brace` for thin paper-style dimension or grouping curly braces placed beside matrices, vertical stacks, tensors, timelines, or grouped rows/columns. It renders a single editable Bezier path using `shape: "paper_curly"` and stays narrow in high-aspect layouts, unlike generic `shape: "curly"` which remains the old/general behavior.
+Use `dimension_brace` for thin paper-style dimension or grouping curly braces placed beside matrices, vertical stacks, tensors, timelines, or grouped rows/columns. It renders a single editable Bezier path using `shape: "paper_curly"` and stays narrow in high-aspect layouts, unlike generic `shape: "curly"` which remains the old/general behavior. The intended grammar is a narrow TeX-like stretch delimiter: very short curled terminals, long near-vertical stems, and a small center waist pinch. It should read as a range marker, not as an ornamental S-shaped brace. Do not use this component for many-to-one merge braces with incoming connector ticks.
 
 ```json
 {
@@ -1753,11 +1753,12 @@ Use `dimension_brace` for thin paper-style dimension or grouping curly braces pl
     "line_weight_pt": 1.05
   },
   "source_visual_facts": {
-    "shape": "thin single-sided paper curly dimension brace",
+    "shape": "thin TeX-like stretch dimension brace",
     "opens_toward": "left"
   },
   "must_match_facts": [
     "not S-shaped",
+    "long near-vertical stems",
     "single editable path",
     "thin high-aspect brace",
     "no arrowhead"

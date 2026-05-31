@@ -5558,35 +5558,47 @@ def paper_curly_brace_points(
     width: float,
     height: float,
     orientation: str,
-    terminal_indent_ratio: float = 0.12,
-    outer_bulge_ratio: float = 0.88,
-    waist_indent_ratio: float = 0.10,
-    neck_ratio: float = 0.08,
-    lobe_ratio: float = 0.18,
+    terminal_indent_ratio: float = 0.08,
+    outer_bulge_ratio: float = 0.46,
+    waist_indent_ratio: float = 0.08,
+    neck_ratio: float = 0.04,
+    lobe_ratio: float = 0.08,
 ) -> list[tuple[float, float]]:
+    """Return a TeX-like stretch brace, not a generic curly aggregation brace.
+
+    The canonical shape is a right brace (`}`): endpoints and waist sit near the
+    grouped object, while the long stems stay nearly vertical on the outer side.
+    This matches paper dimension/range braces beside matrices and stacks.
+    """
     def clamp(value: float, low: float, high: float) -> float:
         return max(low, min(high, float(value)))
 
-    g = clamp(terminal_indent_ratio, 0.00, 0.45)
-    o = clamp(outer_bulge_ratio, 0.55, 1.00)
-    c = clamp(waist_indent_ratio, 0.00, 0.45)
-    n = clamp(neck_ratio, 0.02, 0.30)
-    lobe = clamp(lobe_ratio, 0.06, 0.38)
+    g = clamp(terminal_indent_ratio, 0.00, 0.40)
+    c = clamp(waist_indent_ratio, 0.00, 0.40)
+    o = clamp(max(float(outer_bulge_ratio), max(g, c) + 0.08), 0.16, 1.00)
+    n = clamp(neck_ratio, 0.02, 0.18)
+    lobe = clamp(lobe_ratio, 0.04, 0.24)
     orientation = str(orientation or "right").lower()
 
     canonical = [
         (g, 0.00),
-        (g, 0.02),
-        (o, 0.02),
+        (g, 0.00),
+        (o, 0.00),
         (o, n),
+        (o, min(0.50 - lobe, n + 0.04)),
         (o, 0.50 - lobe),
-        (o, 0.50 - lobe * 0.35),
+        (o, 0.50 - lobe),
+        (o, 0.50 - lobe * 0.55),
+        (c, 0.50 - lobe * 0.18),
         (c, 0.50),
+        (c, 0.50 + lobe * 0.18),
         (o, 0.50 + lobe * 0.35),
         (o, 0.50 + lobe),
+        (o, 0.50 + lobe),
+        (o, max(0.50 + lobe, 1.00 - n - 0.04)),
         (o, 1.00 - n),
-        (o, 0.98),
-        (g, 0.98),
+        (o, 1.00),
+        (g, 1.00),
         (g, 1.00),
     ]
 
@@ -6048,11 +6060,11 @@ def draw_bracket(page: Any, page_height: float, node: dict[str, Any], style: dic
             width,
             height,
             orientation,
-            float(node.get("terminal_indent_ratio", style.get("terminal_indent_ratio", 0.12))),
-            float(node.get("outer_bulge_ratio", style.get("outer_bulge_ratio", 0.88))),
-            float(node.get("waist_indent_ratio", style.get("waist_indent_ratio", 0.10))),
-            float(node.get("neck_ratio", style.get("neck_ratio", 0.08))),
-            float(node.get("lobe_ratio", style.get("lobe_ratio", 0.18))),
+            float(node.get("terminal_indent_ratio", style.get("terminal_indent_ratio", 0.08))),
+            float(node.get("outer_bulge_ratio", style.get("outer_bulge_ratio", 0.46))),
+            float(node.get("waist_indent_ratio", style.get("waist_indent_ratio", 0.08))),
+            float(node.get("neck_ratio", style.get("neck_ratio", 0.04))),
+            float(node.get("lobe_ratio", style.get("lobe_ratio", 0.08))),
         )
         curve_mode = str(node.get("curve_mode", style.get("curve_mode", "bezier"))).lower()
         return draw_single_path(page, page_height, points, line_style, curve_mode)
