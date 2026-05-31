@@ -211,6 +211,13 @@ For exact replicas, add an arrow inventory before authoring edges. This is a sou
         "must_not_cross": ["decoder label", "top caption"],
         "relative_position_facts": ["source and target are horizontally aligned"],
         "must_be_axis_aligned": true,
+        "geometry_contract": {
+          "must_be_horizontal": true,
+          "start_y_equals_end_y": true,
+          "target_boundary": "left",
+          "endpoint_must_touch": true,
+          "tolerance_px": 3
+        },
         "must_not_cross_text": true,
         "certainty": "certain"
       }
@@ -246,6 +253,7 @@ Rules for `arrow_plan`:
 - `loop_update` should use one continuous `loop_arrow`, not several line fragments plus a detached arrowhead.
 - `rounded_orthogonal` should use `rounded_orthogonal_connector` or `route: "rounded_orthogonal"` with an explicit corner radius. Do not map it to `smooth_curve`.
 - `scene_validate.py --strict` treats missing or violated arrow-plan bindings as errors.
+- Use `geometry_contract` when a source arrow has measurable visual geometry that must survive rendering. Supported contract fields include booleans such as `must_be_horizontal`, `must_be_vertical`, `start_y_equals_end_y`, `start_x_equals_end_x`, `endpoint_must_touch`, `must_touch_boundary`, `must_not_cross_text`; string fields such as `source_boundary`, `target_boundary`, `start_anchor`, `end_anchor`; and numeric tolerances such as `tolerance_px` or `tolerance_in`. This is an optional stricter contract for important arrows, not a replacement for `route_shape`.
 
 For local attention-like diagrams, record `metadata.local_motifs` or region-level motif facts before writing edges. Motif names can include `attention_score_motif`, `value_weighting_motif`, `residual_add_norm_motif`, and `concat_merge_motif`. Motif rules are source-level constraints, not decorative labels; for example Softmax in an attention-score motif is a floating label and should not become an edge endpoint.
 
@@ -309,34 +317,45 @@ For high-fidelity paper figures, record the source-region plan before local poli
         "id": "global_layout",
         "source_bbox_px": [0, 0, 1514, 538],
         "target_bbox": [0, 0, 13.333, 4.739],
-        "review_focus": "page aspect, module positions, density"
+        "review_focus": "page aspect, module positions, density",
+        "local_acceptance_checklist": [
+          "page aspect ratio and outer whitespace match source",
+          "major module positions are source-aligned"
+        ]
       },
       {
         "id": "left_input",
         "source_bbox_px": [0, 40, 360, 500],
         "container_id": "input_region",
-        "review_focus": "input tokens, feature vectors, entry arrows"
+        "review_focus": "input tokens, feature vectors, entry arrows",
+        "local_acceptance_checklist": [
+          "input token/cell visual grammar matches the source crop",
+          "entry arrows land on the same visible boundaries as the source"
+        ]
       }
     ]
   }
 }
 ```
 
-For visible or invisible region nodes, record at least one of `source_bbox_px` or `source_aspect_ratio`. When the source crop is dense, add `expected_node_density` after visual analysis. Audit and complexity warnings can flag likely drift, but the quality judge is still visual LLM comparison of the source image and rendered replica. Pair/crop/overlay assets remain author-side debug material.
+For visible or invisible region nodes, record at least one of `source_bbox_px` or `source_aspect_ratio`. For region-first exact replicas, add `review_focus` and `local_acceptance_checklist` to each important region. The checklist should contain source-visible pass criteria that a visual reviewer can answer locally, such as arrow endpoints, formula wrapping, grid cell count, line geometry, boundary crossings, and text overlap. When the source crop is dense, add `expected_node_density` after visual analysis. Audit and complexity warnings can flag likely drift, but the quality judge is still visual LLM comparison of the source image and rendered replica. Pair/crop/overlay assets remain author-side debug material.
 
 ## Large Figure Discipline
 
 Large source images fail differently from small diagrams. The usual problem is not a missing Visio shape; it is global reasoning drift: a few nodes shift, one local font size changes, connectors cross a region boundary, and the whole figure still looks plausible at full scale.
 
-Use this workflow when the scene has roughly 30+ visible nodes, 35+ edges, tiny paper labels, or a very wide aspect ratio:
+Use this workflow when the scene has roughly 30+ visible nodes, 35+ edges, 5+ tiny formulas/math labels, 3+ arrow-dense subsystems, or a very wide paper aspect ratio:
 
 1. Create the full page in source-pixel coordinates.
 2. Add visible `group_container` and invisible `audit_region` boxes before authoring all details.
 3. Assign `container_id` on every meaningful node.
 4. Keep each region around 12-18 visible nodes when possible.
-5. Freeze shared style tokens and font roles before merging region work.
-6. Run `scripts/scene_complexity.py` before full Visio render.
-7. Run `scripts/scene_audit.py` and review every region after assembly.
+5. Reconstruct dense regions as editable local subscenes or editable grouped scene fragments.
+6. Freeze shared style tokens and font roles before merging region work.
+7. Assemble accepted regions with affine translation/scaling only; do not reroute internal region edges in the final page.
+8. Draw cross-region edges through `boundary_port`, `junction_point`, `merge_bus`, or visible target anchors.
+9. Run `scripts/scene_complexity.py` before full Visio render.
+10. Run `scripts/scene_audit.py` and review every region after assembly.
 
 The complexity script reports uncovered nodes, dense regions, text-fit risks, same-type font spread, overlap risks, and validation warnings. Treat those warnings as layout defects before starting visual polish.
 

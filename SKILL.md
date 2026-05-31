@@ -82,12 +82,15 @@ python ${SKILL_DIR}\scripts\stage_source_image.py `
 
 This writes `source/original.<ext>` and `source/source_manifest.json` with SHA-256 hashes. Use the staged image path as `metadata.source_image` and as `make_review_assets.py --original`.
 
-For wide or dense figures, do not start by authoring the whole page in one pass. If the source has many modules, many arrows, tiny labels, or a very wide canvas, first create a region plan:
+For wide or dense figures, do not start by authoring the whole page in one pass. This region-first rule is mandatory for strict/exact replicas when the source has any of these signals: 30+ visible nodes, 35+ visible arrows/edges, 5+ tiny formulas or math labels, 3+ arrow-dense subsystems, a very wide paper layout, or a dense multi-panel source where local details are unreadable at full-page scale. Simple/small diagrams do not need this ceremony.
+
+For those large/dense sources, first create a region plan and do not author the full final scene in one pass:
 - visible regions become `group_container`
 - invisible logical work areas become `audit_region`
 - every meaningful node gets `container_id`
 - each region should usually stay under 12-18 visible nodes before whole-page assembly
 - shared typography and arrow styles must be fixed before region scenes are merged
+- each region should record `review_focus` and a `local_acceptance_checklist` with the concrete source facts that must pass before the region is accepted
 
 For exact replicas, do not write `scene.json` until you have a source-faithful visual inventory for that specific image. This inventory is produced by visual LLM inspection of the source image, not by OCR, filename clues, warning logs, prior scenes, or a batch scene generator. It must preserve visible source language and notation exactly; do not translate Chinese labels to English, normalize formulas, invent unreadable text, or replace source modules with generic neural-network blocks unless the source visibly shows them.
 
@@ -215,6 +218,14 @@ This recipe upgrades fragile local grammar before visual tuning: split Real/Gene
 
 `scene_to_visio.py` no longer runs this autofix implicitly for strict/exact scenes. Use `--autofix-gan-tfr` only when you intentionally want an explicit bootstrap/render helper path, and treat the written `<basename>.autofixed.scene.json` as a non-final rewritten scene until you re-author a fresh strict-replica scene from source inventory.
 
+For region-first exact replicas, local region work must remain editable scene geometry, not raster screenshots:
+- author each dense region as editable nodes, edges, primitive groups, motif nodes, or component nodes
+- wrap the region with a `group_container`, `audit_region`, or `metadata.region_plan` entry so it can be moved as one local subsystem
+- during whole-page assembly, use only affine translation/scaling for the finished region geometry
+- do not reroute internal region edges during full-page assembly; if internal topology is wrong, return to the local region scene/inventory
+- cross-region edges should connect `boundary_port` to `boundary_port`, or a boundary port to a visible target anchor, rather than reaching into the middle of another region
+- if a region was accepted locally, preserve its internal node ids and arrow-plan bindings so later review can tell whether the assembly step introduced drift
+
 ### 3. Validate scene data
 
 Before touching Visio, validate structure and references:
@@ -318,6 +329,7 @@ For exact replicas, the first render is allowed to be a fast editable reconstruc
 - The topology checklist records source facts such as branches, merges, boundary crossings, operator order, arrow endpoints, and required routes. Examples: `S3 -> vertical trunk -> S1/common path`, `S2/S3 -> hollow circle -> minus`, `Linear -> f̂ -> [] -> fused feature`.
 - The visual-layout checklist records overlap, label wrapping, bracket/tensor spacing, line-through-text defects, feature-stack thickness, font-role drift, and color/rounding/shadow mismatches.
 - The fidelity-obligation checklist records "must not simplify" details from `fidelity_obligations`, such as worker limbs/helmets, crossed tools, neural-network node-link marks, ribbon-arrow body/head geometry, or dense icon internals.
+- For region-first scenes, the review findings should also include `region_scores`. Each region should be judged on arrow direction, endpoint connection, line geometry, formula fidelity, text overlap, and unexpected grid/dash fragments. A region with a `fail` score needs a concrete `blocking_findings` item or it is not actionable.
 - A finding should reference the failed checklist item when possible. Do not write only broad notes such as "right output is wrong" when a specific missing branch, wrong landing point, or bracket overlap is visible.
 - Repair rounds must re-check the same crop and checklist items, not only rerun validation or no-op gates.
 
@@ -596,6 +608,8 @@ Why this matters:
 40a. For small variables and formula labels such as `g_tf`, `g_hrrp`, `f_fused`, `P_RGB`, `q_IR`, `s1`, `f1`, or `L_adv`, use `math_text` with `math_render_mode: "fragments"` and `text_fit: "math_label"` when the subscript has uppercase or word-like tokens. `compact_unicode` is allowed only for digit or true-subscript lowercase labels that visually match the source. Never leave them as raw text that Visio can wrap into `g_ / tf`, `f_fu / sed`, or superscript-like `RGB`.
 41. For wide multi-panel figures, create `audit_region` nodes for every titled panel even when the visible frame is drawn with `group_container`; this lets `scene_audit.py` review inputs, outputs, and cross-panel arrows panel by panel.
 42. For large source images, use `metadata.region_strategy: "region_first"` or `"tiled_subscenes"` before rendering. Also add `metadata.region_plan` entries for global/input/core/output/arrow-dense/small-text/boundary areas, each with `source_bbox_px` and a target bbox/container. If the figure is too complex to reason about at full-page scale, author each region as a local subscene, validate it, then copy the region nodes into the full scene with the same style tokens.
+42a. Apply the region-first rule before full-scene authoring when a strict/exact source has 30+ visible nodes, 35+ visible arrows/edges, 5+ tiny formulas, 3+ arrow-dense subsystems, or a very wide paper layout. Write `metadata.region_plan[].review_focus` and `metadata.region_plan[].local_acceptance_checklist` before detailed node authoring. Small diagrams can stay single-scene.
+42b. Treat region subscenes as editable scene fragments, not raster tiles. During assembly, translate/scale the accepted region geometry, preserve its internal node ids and `arrow_plan_id` bindings, and connect regions through `boundary_port`, `junction_point`, or visible target anchors. Do not reroute accepted internal edges during final assembly.
 43. Do not let every region invent its own font sizes. Define a small scale and reuse it: frame titles, body labels, small labels, operator symbols, formula labels, and edge labels. If `scene_validate.py` reports same-type font spread, normalize the style before rendering.
 44. When reconstructing from cropped subregions, keep crop-local coordinates only during analysis. Convert to the full-page pixel coordinate system before final assembly so arrows and labels do not drift at seams.
 45. Use `scene_complexity.py` before full-page Visio output whenever the scene has roughly 30+ visible nodes, 35+ edges, or a very wide aspect ratio. Treat text-fit, overlap, uncovered-node, and dense-region warnings as actionable defects.
@@ -631,11 +645,12 @@ Why this matters:
 74. For exact or GAN/TFR renders, do not call `scene_to_visio.py` as a blind final step. Run the rebuild gate first, or let the renderer's built-in gate stop the export when `[REBUILD]` items remain.
 75. If a dashed feedback path looks like a tiny isolated arrow fragment, treat that as a semantic-route failure, not a cosmetic issue. Rebuild it as one `dashed_feedback_path` or a bus/port route instead of preserving the fragment.
 76. Before writing edges for exact replicas, produce `metadata.arrow_plan` from source-image visual inspection. Then bind each source-visible edge with `arrow_plan_id`; run `scene_validate.py --strict` before rendering so missing arrows, diagonal drift, wrong boundary endpoints, fragmented feedback paths, and broken loop arrows fail early.
-76a. Do a typography pass for exact replicas. Identify whether the source uses serif, sans, math, mono, CJK, or mixed typography before finalizing nodes; do not let every text node inherit a generic default by accident.
-76b. Do a `visual_grammar_inventory` pass before component selection. First write source facts for shapes, cells, lines, symbols, waves, and text; only then choose renderer components.
-76c. For repeated small rectangular cells, use `cell_strip` or `micro_grid` with explicit `cell_count`/`rows`/`cols`, `cell_gap_in`, and `cell_rounding_in`. Do not use rounded token/grid defaults when the source facts say rectangular, continuous, or low rounding.
-76d. For waveform-like details whose local silhouette matters, use `polyline_wave` with explicit `points` or `samples`. Do not let exact replicas fall back to a generic sine wave.
-76e. For small icon-like structures made from circles, triangles, plus/cross marks, arcs, or local decorative lines, use `symbol_group`, `shape_cluster`, or `primitive_group` with `subshapes`. Mark internal lines with `subshape_role`/`edge_role` such as `symbol_internal`, `icon_internal`, or `decorative_internal` so topology audit does not mistake icon geometry for main flow.
+76a. For source arrows with strict geometry, add `geometry_contract` inside the `arrow_plan` entry. Use it for facts such as `must_be_horizontal`, `must_be_vertical`, `start_y_equals_end_y`, `start_x_equals_end_x`, `target_boundary`, `endpoint_must_touch`, `must_touch_boundary`, and `tolerance_px`. This is stronger than a vague route label and lets review compare visible endpoints instead of arguing about intent.
+76b. Do a typography pass for exact replicas. Identify whether the source uses serif, sans, math, mono, CJK, or mixed typography before finalizing nodes; do not let every text node inherit a generic default by accident.
+76c. Do a `visual_grammar_inventory` pass before component selection. First write source facts for shapes, cells, lines, symbols, waves, and text; only then choose renderer components.
+76d. For repeated small rectangular cells, use `cell_strip` or `micro_grid` with explicit `cell_count`/`rows`/`cols`, `cell_gap_in`, and `cell_rounding_in`. Do not use rounded token/grid defaults when the source facts say rectangular, continuous, or low rounding.
+76e. For waveform-like details whose local silhouette matters, use `polyline_wave` with explicit `points` or `samples`. Do not let exact replicas fall back to a generic sine wave.
+76f. For small icon-like structures made from circles, triangles, plus/cross marks, arcs, or local decorative lines, use `symbol_group`, `shape_cluster`, or `primitive_group` with `subshapes`. Mark internal lines with `subshape_role`/`edge_role` such as `symbol_internal`, `icon_internal`, or `decorative_internal` so topology audit does not mistake icon geometry for main flow.
 77. Use `font_family_candidates` and `font_role` instead of a single fragile font name when exact family matching is uncertain. The renderer resolves to the first installed close match.
 78. If the source font is known, set `source_font_family` as well as `font_family`/`font_family_candidates`. This lets audit catch the case where the font exists locally but the scene still renders with the wrong family.
 79. Run `scripts/font_inventory.py` when a figure appears to use Calibri/Aptos/Arial/Times/Cambria/Chinese fonts. A missing source font should lead to a candidate list; an installed source font should be used directly.

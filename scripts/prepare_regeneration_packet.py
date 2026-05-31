@@ -170,6 +170,28 @@ def arrow_repair_targets_section(targets: list[dict[str, Any]]) -> str:
     return "\n".join(rows) + "\n"
 
 
+def region_scores_section(region_scores: list[dict[str, Any]]) -> str:
+    if not region_scores:
+        return "## Region Scores\n\n- none recorded\n"
+    rows = ["## Region Scores", ""]
+    for item in region_scores:
+        if not isinstance(item, dict):
+            continue
+        region_id = str(item.get("region_id", "region")).strip() or "region"
+        scores = item.get("scores") if isinstance(item.get("scores"), dict) else {}
+        blocking = normalize_string_list(item.get("blocking_findings"))
+        focus = str(item.get("review_focus", "")).strip()
+        rows.append(f"- `{region_id}`")
+        if focus:
+            rows.append(f"  - review_focus: {focus}")
+        if scores:
+            compact_scores = ", ".join(f"{key}={value}" for key, value in scores.items())
+            rows.append(f"  - scores: {compact_scores}")
+        if blocking:
+            rows.append(f"  - blocking_findings: {', '.join(blocking)}")
+    return "\n".join(rows) + "\n"
+
+
 def checklist_validation_section(validation: dict[str, Any]) -> str:
     if not validation:
         return "## Checklist Validation\n\n- none recorded\n"
@@ -237,6 +259,9 @@ def main() -> int:
     fidelity_checklist = rebuild_brief.get("fidelity_checklist", [])
     if not isinstance(fidelity_checklist, list):
         fidelity_checklist = []
+    region_scores = rebuild_brief.get("region_scores", [])
+    if not isinstance(region_scores, list):
+        region_scores = []
     checklist_validation = rebuild_brief.get("checklist_validation", {})
     if not isinstance(checklist_validation, dict):
         checklist_validation = {}
@@ -263,6 +288,7 @@ def main() -> int:
         "topology_checklist": topology_checklist,
         "visual_checklist": visual_checklist,
         "fidelity_checklist": fidelity_checklist,
+        "region_scores": region_scores,
         "checklist_validation": checklist_validation,
         "findings_digest": findings_digest,
         "arrow_plan_repair_targets": arrow_plan_repair_targets,
@@ -279,7 +305,7 @@ def main() -> int:
         "execution_contract": [
             "Use the original image and current replica image as the primary visual evidence.",
             "Use structured review findings to author a brand-new full scene.",
-            "Use topology_checklist, visual_checklist, fidelity_checklist, and arrow_plan_repair_targets as explicit regeneration inputs.",
+            "Use topology_checklist, visual_checklist, fidelity_checklist, region_scores, and arrow_plan_repair_targets as explicit regeneration inputs.",
             "For cited arrow ids, repair the mapped scene_edge_ids or motif_bindings rather than relying on broad natural-language arrow notes.",
             "Do not patch or copy prior-scene geometry.",
             "Render the new scene and pass it through the no-op gate before claiming a new round.",
@@ -328,6 +354,8 @@ def main() -> int:
             checklist_section("Visual Checklist", [item for item in visual_checklist if isinstance(item, dict)]).rstrip(),
             "",
             checklist_section("Fidelity Checklist", [item for item in fidelity_checklist if isinstance(item, dict)]).rstrip(),
+            "",
+            region_scores_section([item for item in region_scores if isinstance(item, dict)]).rstrip(),
             "",
             checklist_validation_section(checklist_validation).rstrip(),
             "",

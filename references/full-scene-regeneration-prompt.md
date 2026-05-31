@@ -32,9 +32,10 @@ This is not a patch task.
 1. Re-read the original source image.
 2. Re-read the current replica image.
 3. Read all review findings.
-4. Build a fresh source visual inventory for the full figure.
-5. Build a fresh `metadata.region_plan`.
-6. Author a fresh full `scene.json`.
+4. Read the topology, visual, fidelity, arrow-plan, and region-score checklists as constraints.
+5. Build a fresh source visual inventory for the full figure.
+6. Build a fresh `metadata.region_plan` with region-local acceptance criteria for dense areas.
+7. Author a fresh full `scene.json`.
 
 Do not skip directly from review findings to coordinate edits.
 
@@ -66,6 +67,7 @@ The new scene must:
 - include exact-replica metadata
 - include a fresh `source_visual_inventory`
 - include a fresh `region_plan`
+- include `review_focus` and `local_acceptance_checklist` for dense/arrow/formula regions
 - be authorable without relying on pair/crop packs
 - differ materially from the prior scene in the defect areas described by review findings
 

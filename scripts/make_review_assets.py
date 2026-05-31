@@ -9,6 +9,15 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from scene_validate import STRICT_REQUIRED_REGION_CATEGORIES, arrow_plan_items, exact_mode_from_metadata, region_categories
 
+REGION_SCORE_KEYS = (
+    "arrow_direction",
+    "endpoint_connection",
+    "line_geometry",
+    "formula_fidelity",
+    "text_overlap",
+    "unexpected_grid_or_dash",
+)
+
 
 def load_font(size: int) -> ImageFont.ImageFont:
     for name in ("arial.ttf", "msyh.ttc", "simhei.ttf"):
@@ -396,6 +405,40 @@ def fidelity_obligation_checklist(scene: dict[str, object] | None, start_index: 
     return items
 
 
+def region_review_scores(scene: dict[str, object] | None) -> list[dict[str, object]]:
+    if not isinstance(scene, dict):
+        return []
+    metadata = scene.get("metadata", {}) if isinstance(scene.get("metadata"), dict) else {}
+    plan = metadata.get("region_plan", metadata.get("source_region_plan", metadata.get("source_regions")))
+    if not isinstance(plan, list):
+        return []
+    rows: list[dict[str, object]] = []
+    for index, region in enumerate(plan, 1):
+        if not isinstance(region, dict):
+            continue
+        region_id = str(region.get("id", region.get("name", f"region_{index}"))).strip() or f"region_{index}"
+        categories = sorted(region_categories(region))
+        checklist = region.get("local_acceptance_checklist")
+        rows.append(
+            {
+                "region_id": region_id,
+                "categories": categories,
+                "review_focus": region.get("review_focus", ""),
+                "local_acceptance_checklist": checklist if isinstance(checklist, list) else [],
+                "scores": {
+                    "arrow_direction": "not_reviewed" if "arrow_dense" in categories else "not_applicable",
+                    "endpoint_connection": "not_reviewed" if "arrow_dense" in categories else "not_applicable",
+                    "line_geometry": "not_reviewed",
+                    "formula_fidelity": "not_reviewed" if "small_text" in categories else "not_applicable",
+                    "text_overlap": "not_reviewed",
+                    "unexpected_grid_or_dash": "not_reviewed",
+                },
+                "blocking_findings": [],
+            }
+        )
+    return rows
+
+
 def human_review_checklist_markdown(manifest: dict[str, object]) -> str:
     lines = [
         "# Human Review Checklist",
@@ -426,6 +469,23 @@ def human_review_checklist_markdown(manifest: dict[str, object]) -> str:
             expectation = item.get("source_expectation", item.get("source_fact", "check source-matched appearance"))
             lines.append(f"- [ ] `{label}` ({focus}): {expectation}")
         lines.append("")
+    region_scores = manifest.get("region_scores")
+    lines.extend(["## Region Scores", ""])
+    if isinstance(region_scores, list) and region_scores:
+        for region in region_scores:
+            if not isinstance(region, dict):
+                continue
+            region_id = region.get("region_id", "region")
+            focus = region.get("review_focus", "")
+            lines.append(f"- [ ] `{region_id}`: {focus or 'review local source facts'}")
+            checklist = region.get("local_acceptance_checklist")
+            if isinstance(checklist, list):
+                for item in checklist:
+                    if str(item).strip():
+                        lines.append(f"  - [ ] {item}")
+        lines.append("")
+    else:
+        lines.extend(["- [ ] No region score scaffold recorded.", ""])
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -453,6 +513,7 @@ def review_bundle_payload(
     topology_checklist = arrow_plan_topology_checklist(scene)
     visual_checklist = visual_grammar_checklist(scene)
     fidelity_checklist = fidelity_obligation_checklist(scene, start_index=1)
+    region_scores = region_review_scores(scene)
     manifest = {
         "schema_version": "0.1",
         "figure_id": figure_id,
@@ -470,6 +531,7 @@ def review_bundle_payload(
         "arrow_plan_checklist": topology_checklist,
         "visual_checklist": visual_checklist,
         "fidelity_checklist": fidelity_checklist,
+        "region_scores": region_scores,
         "debug_asset_policy": {
             "global_pair": "off_by_default; generate only with --include-global-pair for human navigation or audit records",
             "crops": "targeted_only; generate named crops with --crops or scene regions with --region-crops all",
@@ -512,6 +574,7 @@ def review_bundle_payload(
         "topology_checklist": topology_checklist,
         "visual_checklist": visual_checklist,
         "fidelity_checklist": fidelity_checklist,
+        "region_scores": region_scores,
     }
     rebuild_template = {
         "schema_version": "0.1",

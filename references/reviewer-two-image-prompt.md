@@ -17,6 +17,8 @@ If the task explicitly provides one or two targeted local crop pairs, use them o
 
 Compare the two images visually and decide whether the replica is a source-faithful reconstruction.
 
+Do not only describe global similarity. If a region checklist, region id, crop intent, or local acceptance checklist is provided as context, inspect each region separately and answer whether that region passes. A globally similar figure can still fail when one local region has wrong arrows, broken formulas, line-through-text, or unexpected dashed/grid fragments.
+
 Focus on visible fidelity only:
 
 - global layout and aspect
@@ -76,6 +78,20 @@ Use this schema:
       "certainty": "certain"
     }
   ],
+  "region_scores": [
+    {
+      "region_id": "arrow_dense",
+      "scores": {
+        "arrow_direction": "fail",
+        "endpoint_connection": "fail",
+        "line_geometry": "uncertain",
+        "formula_fidelity": "not_applicable",
+        "text_overlap": "pass",
+        "unexpected_grid_or_dash": "fail"
+      },
+      "blocking_findings": ["F001"]
+    }
+  ],
   "findings": [
     {
       "id": "F001",
@@ -98,10 +114,12 @@ The checklist fields are mandatory for exact-replica reviews:
 - `topology_checklist`: source-derived graph facts. Check branches, merges, shared trunks, operator order, arrow direction, arrow endpoints, boundary crossings, and required special components.
 - `visual_checklist`: source-derived layout/style/visual-grammar facts. Check overlap, line-through-text, label wrapping, cell count/gap/rounding, symbol internals, sampled wave shape, math text attachment, bracket/tensor spacing, feature-stack thickness, title placement, color, rounding, line weight, and shadow.
 - `fidelity_checklist`: source-object obligations that must not be simplified away. Check worker/person details, crossed tools, neural-network node-link motifs, dense device/icon internals, and thick/ribbon arrow body-head shape.
+- `region_scores`: per-region review status when region context is provided. For every region, answer whether arrow directions are correct, endpoints visibly connect to the right boundary/port, horizontal/vertical/curved lines match the source, formulas render as formulas rather than raw `_`/`^` text, text overlaps are absent, and there are no unexpected grids, dashed fragments, broken connector gaps, or stray arrow stubs. Use `pass`, `fail`, `uncertain`, `not_reviewed`, or `not_applicable`.
 - `status`: use `pass`, `fail`, or `uncertain`.
 - `certainty`: use `certain`, `inferred`, or `uncertain`.
 - Use `uncertain` instead of inventing details when a source crop is unclear.
 - Every non-acceptable finding should cite failed checklist items through `checklist_refs` when possible.
+- Every region score with `fail` must cite concrete finding ids in `blocking_findings`; do not mark a region failed without saying what visible defect caused the failure.
 - Include pass items for critical details that already match, so later rounds can avoid regressions.
 
 ## Severity

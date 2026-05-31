@@ -314,6 +314,7 @@ def validate_checklists(findings_doc: dict[str, Any], findings: list[dict[str, A
         "topology_checklist": topology,
         "visual_checklist": visual,
         "fidelity_checklist": fidelity,
+        "region_scores": findings_doc.get("region_scores") if isinstance(findings_doc.get("region_scores"), list) else [],
         "checklist_validation": {
             "required": require,
             "errors": errors,
@@ -386,6 +387,7 @@ def main() -> int:
         "topology_checklist": checklist_report["topology_checklist"],
         "visual_checklist": checklist_report["visual_checklist"],
         "fidelity_checklist": checklist_report["fidelity_checklist"],
+        "region_scores": checklist_report["region_scores"],
         "checklist_validation": checklist_report["checklist_validation"],
         "findings_digest": [finding_digest(finding) for finding in findings],
         "arrow_plan_repair_targets": arrow_repair_targets,

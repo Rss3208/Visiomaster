@@ -8,7 +8,16 @@ from typing import Any
 
 
 VALID_STATUS = {"pass", "fail", "uncertain"}
+VALID_REGION_SCORE = {"pass", "fail", "uncertain", "not_reviewed", "not_applicable"}
 VALID_CERTAINTY = {"certain", "inferred", "uncertain"}
+REGION_SCORE_KEYS = {
+    "arrow_direction",
+    "endpoint_connection",
+    "line_geometry",
+    "formula_fidelity",
+    "text_overlap",
+    "unexpected_grid_or_dash",
+}
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -67,6 +76,53 @@ def validate_items(items: list[dict[str, Any]], kind: str, failures: list[str], 
     return ids
 
 
+def validate_region_scores(value: object, failures: list[str], warnings: list[str]) -> tuple[int, list[str]]:
+    if value is None:
+        return 0, []
+    if not isinstance(value, list):
+        failures.append("`region_scores` must be an array when provided.")
+        return 0, []
+    failed_regions: list[str] = []
+    seen: set[str] = set()
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            failures.append(f"region_scores[{index}] must be an object.")
+            continue
+        region_id = str(item.get("region_id", "")).strip()
+        label = region_id or f"region_scores[{index}]"
+        if not region_id:
+            failures.append(f"region_scores[{index}] is missing region_id.")
+        elif region_id in seen:
+            failures.append(f"region_scores duplicate region_id `{region_id}`.")
+        seen.add(region_id)
+
+        scores = item.get("scores")
+        if not isinstance(scores, dict):
+            failures.append(f"{label} scores must be an object.")
+            continue
+        region_failed = False
+        for key in REGION_SCORE_KEYS:
+            if key not in scores:
+                warnings.append(f"{label} scores has no `{key}` entry.")
+                continue
+            status = str(scores.get(key, "")).strip().lower()
+            if status not in VALID_REGION_SCORE:
+                failures.append(f"{label} scores.{key} has invalid value `{scores.get(key)}`.")
+            if status == "fail":
+                region_failed = True
+        blocking = item.get("blocking_findings", [])
+        if blocking is None:
+            blocking = []
+        if not isinstance(blocking, list):
+            failures.append(f"{label} blocking_findings must be an array.")
+            blocking = []
+        if region_failed and not blocking:
+            failures.append(f"{label} has a fail score but no blocking_findings.")
+        if region_failed and region_id:
+            failed_regions.append(region_id)
+    return len(value), sorted(set(failed_regions))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate review checklist coverage and finding references.")
     parser.add_argument("findings", help="Path to review_findings.json")
@@ -93,6 +149,7 @@ def main() -> int:
     ids = validate_items(topology, "topology_checklist", failures, warnings)
     ids |= validate_items(visual, "visual_checklist", failures, warnings)
     ids |= validate_items(fidelity, "fidelity_checklist", failures, warnings)
+    region_score_count, failed_regions = validate_region_scores(doc.get("region_scores"), failures, warnings)
     failed_ids = {
         str(item.get("id", "")).strip()
         for item in topology + visual + fidelity
@@ -140,7 +197,9 @@ def main() -> int:
         "topology_count": len(topology),
         "visual_count": len(visual),
         "fidelity_count": len(fidelity),
+        "region_score_count": region_score_count,
         "failed_checklist_ids": sorted(failed_ids),
+        "failed_regions": failed_regions,
     }
     if args.output_report:
         output_path = Path(args.output_report).resolve()
@@ -161,7 +220,9 @@ def main() -> int:
     print(f"- topology checklist items: {len(topology)}")
     print(f"- visual checklist items: {len(visual)}")
     print(f"- fidelity checklist items: {len(fidelity)}")
+    print(f"- region score items: {region_score_count}")
     print(f"- failed checklist ids: {len(failed_ids)}")
+    print(f"- failed regions: {len(failed_regions)}")
     if warnings:
         print("Warnings:")
         for warning in warnings:

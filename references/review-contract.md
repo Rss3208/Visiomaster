@@ -121,6 +121,20 @@ The visual reviewer writes concrete diffs in this format:
       "certainty": "certain"
     }
   ],
+  "region_scores": [
+    {
+      "region_id": "output_right",
+      "scores": {
+        "arrow_direction": "fail",
+        "endpoint_connection": "fail",
+        "line_geometry": "uncertain",
+        "formula_fidelity": "not_applicable",
+        "text_overlap": "pass",
+        "unexpected_grid_or_dash": "pass"
+      },
+      "blocking_findings": ["D001"]
+    }
+  ],
   "findings": [
     {
       "id": "D001",
@@ -143,11 +157,14 @@ The checklist fields are the reviewer's source-derived acceptance criteria:
 - `topology_checklist` is for visible source graph facts: arrow direction, endpoints, route shape, branches, merges, shared trunks, boundary crossings, operator order, and required special components. It is not a schema check; it comes from visual comparison of the original source and replica.
 - `visual_checklist` is for local appearance and visual grammar facts: overlap, line-through-text, label wrapping, cell count/gap/rounding, symbol internals, sampled wave shape, bracket/tensor spacing, tensor thickness, title position, font role, line weight, color, rounding, and shadow.
 - `fidelity_checklist` is for source-object obligations that must not be simplified away: worker/person details, crossed tools, node-link motifs, dense device icons, and ribbon-arrow body/head geometry.
+- `region_scores` is for region-first exact scenes. Each region can score `arrow_direction`, `endpoint_connection`, `line_geometry`, `formula_fidelity`, `text_overlap`, and `unexpected_grid_or_dash` as `pass`, `fail`, `uncertain`, `not_reviewed`, or `not_applicable`. A `fail` score must list concrete finding ids in `blocking_findings`; otherwise the region review is not actionable.
 - `status` should be `pass`, `fail`, or `uncertain`. Use `uncertain` when the source crop is unclear; do not invent topology.
 - Findings should cite failed checklist ids through `checklist_refs` when possible.
 - A review may include passing checklist items. They help later rounds avoid regressing details that already match.
 
 When the scene includes `metadata.arrow_plan`, the topology checklist should reference those arrow ids whenever possible. For example, report `A003 fails: source is a horizontal boundary-to-module arrow, replica lands on the module center and becomes diagonal`. Do not collapse several arrow defects into one broad note such as "arrows are wrong"; the rebuild brief needs per-arrow evidence.
+
+When the scene includes `metadata.region_plan[].local_acceptance_checklist`, use those region-local facts as the visible acceptance criteria. A global verdict is not enough; the reviewer should say which region fails and whether the failure is arrow direction, endpoint connection, line geometry, formula fidelity, text overlap, or unexpected grid/dash artifacts.
 
 Required fields:
 

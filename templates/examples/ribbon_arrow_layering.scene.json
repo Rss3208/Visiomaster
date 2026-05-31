@@ -103,7 +103,18 @@
     "region_plan": [
       {"id": "global", "source_bbox_px": [0, 0, 1600, 900], "target_bbox": [0, 0, 8, 4.5], "crop_type": "global"},
       {"id": "input", "source_bbox_px": [100, 260, 450, 640], "target_bbox": [0.5, 1.3, 1.75, 1.9], "crop_type": "input"},
-      {"id": "core", "source_bbox_px": [450, 260, 1150, 640], "target_bbox": [2.25, 1.3, 3.5, 1.9], "crop_type": "core arrow_dense small_text"},
+      {
+        "id": "core",
+        "source_bbox_px": [450, 260, 1150, 640],
+        "target_bbox": [2.25, 1.3, 3.5, 1.9],
+        "crop_type": "core arrow_dense small_text",
+        "review_focus": "ribbon arrow body/head geometry, center label layering, and text non-overlap",
+        "local_acceptance_checklist": [
+          "filled ribbon arrow remains behind the center label",
+          "wide triangular head points right without becoming a thin connector",
+          "center label is readable and not crossed by the arrow body"
+        ]
+      },
       {"id": "output", "source_bbox_px": [1150, 260, 1500, 640], "target_bbox": [5.75, 1.3, 7.5, 3.2], "crop_type": "output"}
     ]
   },

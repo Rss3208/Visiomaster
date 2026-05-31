@@ -142,6 +142,30 @@ ARROW_PLAN_DIRECTIONS = {
     "none",
     "unknown",
 }
+GEOMETRY_CONTRACT_BOOL_FIELDS = {
+    "must_be_horizontal",
+    "must_be_vertical",
+    "start_y_equals_end_y",
+    "start_x_equals_end_x",
+    "endpoint_must_touch",
+    "must_touch_boundary",
+    "must_not_cross_text",
+    "must_be_axis_aligned",
+}
+GEOMETRY_CONTRACT_STRING_FIELDS = {
+    "source_boundary",
+    "target_boundary",
+    "start_anchor",
+    "end_anchor",
+    "source_anchor",
+    "target_anchor",
+}
+GEOMETRY_CONTRACT_NUMBER_FIELDS = {
+    "tolerance_px",
+    "tolerance_in",
+    "max_endpoint_gap_px",
+    "max_endpoint_gap_in",
+}
 
 
 def exact_mode_from_metadata(metadata: Any) -> bool:
@@ -200,6 +224,17 @@ def bbox_signature(value: Any) -> tuple[float, float, float, float] | None:
     if right <= left or bottom <= top:
         return None
     return left, top, right, bottom
+
+
+def string_list_signature(value: Any) -> list[str] | None:
+    if not isinstance(value, list):
+        return None
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            return None
+        result.append(item.strip())
+    return result
 
 
 def line_length(points: list[tuple[float, float]]) -> float:
@@ -1927,6 +1962,22 @@ def validate_fidelity_metadata(
                 contract_issue(
                     f"metadata.region_plan[{index}] should record crop_type/review_crop_type so QA can generate the intended regional crop."
                 )
+            local_acceptance = region.get("local_acceptance_checklist")
+            if local_acceptance is not None and string_list_signature(local_acceptance) is None:
+                contract_issue(
+                    f"metadata.region_plan[{index}].local_acceptance_checklist should be an array of non-empty strings."
+                )
+            if strict_contract and ({"arrow_dense", "small_text"} & categories) and not local_acceptance:
+                contract_issue(
+                    f"metadata.region_plan[{index}] is a dense review region but has no local_acceptance_checklist."
+                )
+            review_focus = region.get("review_focus")
+            if strict_contract and ({"arrow_dense", "small_text"} & categories) and not (
+                isinstance(review_focus, str) and review_focus.strip()
+            ):
+                contract_issue(
+                    f"metadata.region_plan[{index}] is a dense review region but has no review_focus."
+                )
         missing_plan_categories = [category for category in required_categories if category not in plan_coverage]
         if missing_plan_categories:
             contract_issue(
@@ -2080,6 +2131,28 @@ def validate_arrow_plan_contract(
         bbox = plan.get("source_bbox_px")
         if strict_contract and bbox is not None and bbox_signature(bbox) is None:
             contract_issue(f"metadata.arrow_plan `{plan_id}` has invalid source_bbox_px; expected [left, top, right, bottom].")
+        geometry_contract = plan.get("geometry_contract")
+        if geometry_contract is not None:
+            if not isinstance(geometry_contract, dict):
+                contract_issue(f"metadata.arrow_plan `{plan_id}` geometry_contract should be an object.")
+            else:
+                for key, value in geometry_contract.items():
+                    if key in GEOMETRY_CONTRACT_BOOL_FIELDS and not isinstance(value, bool):
+                        contract_issue(f"metadata.arrow_plan `{plan_id}` geometry_contract.{key} should be boolean.")
+                    elif key in GEOMETRY_CONTRACT_STRING_FIELDS and not isinstance(value, str):
+                        contract_issue(f"metadata.arrow_plan `{plan_id}` geometry_contract.{key} should be a string.")
+                    elif key in GEOMETRY_CONTRACT_NUMBER_FIELDS and not isinstance(value, (int, float)):
+                        contract_issue(f"metadata.arrow_plan `{plan_id}` geometry_contract.{key} should be numeric.")
+                horizontal_contract = bool(geometry_contract.get("must_be_horizontal"))
+                vertical_contract = bool(geometry_contract.get("must_be_vertical"))
+                if horizontal_contract and route_shape in {"straight_vertical", "vertical"}:
+                    contract_issue(f"metadata.arrow_plan `{plan_id}` geometry_contract requires horizontal geometry but route_shape is `{route_shape}`.")
+                if vertical_contract and route_shape in {"straight_horizontal", "horizontal"}:
+                    contract_issue(f"metadata.arrow_plan `{plan_id}` geometry_contract requires vertical geometry but route_shape is `{route_shape}`.")
+                if horizontal_contract and route_shape in {"curved", "smooth_curve", "loop", "freeform"}:
+                    contract_issue(f"metadata.arrow_plan `{plan_id}` geometry_contract requires horizontal geometry but route_shape is `{route_shape}`.")
+                if vertical_contract and route_shape in {"curved", "smooth_curve", "loop", "freeform"}:
+                    contract_issue(f"metadata.arrow_plan `{plan_id}` geometry_contract requires vertical geometry but route_shape is `{route_shape}`.")
 
     edges_by_plan: dict[str, list[dict[str, Any]]] = {}
     motif_edges_by_plan: dict[str, list[dict[str, Any]]] = {}
@@ -2174,6 +2247,7 @@ def validate_arrow_plan_contract(
         plan_requires_ribbon = any(token in arrow_form_text for token in {"ribbon", "thick arrow", "filled arrow", "broad arrow", "band arrow"})
         from_anchor = plan.get("from_anchor", plan.get("source_anchor"))
         to_anchor = plan.get("to_anchor", plan.get("target_anchor"))
+        geometry_contract = plan.get("geometry_contract") if isinstance(plan.get("geometry_contract"), dict) else {}
         must_axis = bool(plan.get("must_be_axis_aligned")) or route_shape in {
             "straight_horizontal",
             "straight_vertical",
@@ -2185,7 +2259,9 @@ def validate_arrow_plan_contract(
             "rounded_orthogonal",
             "hv",
             "vh",
-        }
+        } or bool(geometry_contract.get("must_be_axis_aligned"))
+        geometry_horizontal = bool(geometry_contract.get("must_be_horizontal"))
+        geometry_vertical = bool(geometry_contract.get("must_be_vertical"))
 
         for motif_edge in motif_plan_edges:
             motif_edge_id = str(motif_edge.get("id", "<motif-edge>"))
@@ -2260,6 +2336,10 @@ def validate_arrow_plan_contract(
                 contract_issue(f"Arrow plan `{plan_id}` expects a horizontal arrow but edge `{edge_id}` has {sorted(axes)} segment(s).")
             if route_shape in {"straight_vertical", "vertical"} and axes - {"vertical"}:
                 contract_issue(f"Arrow plan `{plan_id}` expects a vertical arrow but edge `{edge_id}` has {sorted(axes)} segment(s).")
+            if geometry_horizontal and axes - {"horizontal"}:
+                contract_issue(f"Arrow plan `{plan_id}` geometry_contract expects horizontal geometry but edge `{edge_id}` has {sorted(axes)} segment(s).")
+            if geometry_vertical and axes - {"vertical"}:
+                contract_issue(f"Arrow plan `{plan_id}` geometry_contract expects vertical geometry but edge `{edge_id}` has {sorted(axes)} segment(s).")
             if route_shape in {"curved", "smooth_curve", "loop"}:
                 if edge_type not in CURVED_EDGE_TYPES:
                     contract_issue(f"Arrow plan `{plan_id}` expects a curved/loop arrow but edge `{edge_id}` uses `{edge_type}`.")

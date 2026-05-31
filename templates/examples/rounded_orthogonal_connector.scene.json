@@ -29,7 +29,8 @@
           "required_labels": ["Branch", "Avoid", "Output"],
           "required_edge_motifs": ["rounded orthogonal connector around the middle module"],
           "box_style_facts": ["white page background", "light filled rounded process boxes"],
-          "line_style_facts": ["single solid connector with one final arrowhead"]
+          "line_style_facts": ["single solid connector with one final arrowhead"],
+          "text_layout_facts": ["single-line centered labels", "no formula or subscript text in this region"]
         },
         {
           "id": "input_branch",
@@ -38,7 +39,8 @@
           "required_labels": ["Branch"],
           "required_component_motifs": ["left rounded process box"],
           "box_style_facts": ["rounded rectangle with light fill"],
-          "line_style_facts": ["connector starts from the right edge midpoint"]
+          "line_style_facts": ["connector starts from the right edge midpoint"],
+          "text_layout_facts": ["Branch label centered and unwrapped"]
         },
         {
           "id": "core_avoidance",
@@ -47,7 +49,8 @@
           "required_labels": ["Avoid"],
           "required_component_motifs": ["middle rounded module avoided by the route"],
           "box_style_facts": ["rounded rectangle with light fill"],
-          "line_style_facts": ["connector bends around this box instead of crossing it"]
+          "line_style_facts": ["connector bends around this box instead of crossing it"],
+          "text_layout_facts": ["Avoid label centered and unwrapped"]
         },
         {
           "id": "output_module",
@@ -56,7 +59,8 @@
           "required_labels": ["Output"],
           "required_component_motifs": ["right rounded process box"],
           "box_style_facts": ["rounded rectangle with light fill"],
-          "line_style_facts": ["final arrowhead lands on the left edge midpoint"]
+          "line_style_facts": ["final arrowhead lands on the left edge midpoint"],
+          "text_layout_facts": ["Output label centered and unwrapped"]
         },
         {
           "id": "arrow_lane",
@@ -64,7 +68,8 @@
           "source_bbox_px": [270, 175, 625, 370],
           "required_edge_motifs": ["rounded 90-degree bend", "final arrowhead only"],
           "box_style_facts": ["route keeps clearance around middle module"],
-          "line_style_facts": ["horizontal and vertical lanes stay straight while only corners are rounded"]
+          "line_style_facts": ["horizontal and vertical lanes stay straight while only corners are rounded"],
+          "text_layout_facts": ["connector does not cross visible text"]
         },
         {
           "id": "label_check",
@@ -73,7 +78,8 @@
           "required_labels": ["Branch", "Avoid", "Output"],
           "required_component_motifs": ["unwrapped labels inside process boxes"],
           "box_style_facts": ["labels remain centered in rounded boxes"],
-          "line_style_facts": ["connector does not overlap labels"]
+          "line_style_facts": ["connector does not overlap labels"],
+          "text_layout_facts": ["all labels are single-line, centered, and unwrapped"]
         }
       ]
     },
@@ -97,28 +103,44 @@
         "crop_type": "core",
         "source_bbox_px": [330, 160, 530, 280],
         "target_bbox": [330, 160, 530, 280],
-        "review_focus": "middle module remains avoided by route"
+        "review_focus": "middle module remains avoided by route",
+        "local_acceptance_checklist": [
+          "connector passes around the middle module without crossing its label",
+          "straight lanes remain axis-aligned while bends are rounded"
+        ]
       },
       {
         "id": "output_module",
         "crop_type": "output",
         "source_bbox_px": [580, 280, 770, 390],
         "target_bbox": [580, 280, 770, 390],
-        "review_focus": "output block and final arrowhead endpoint"
+        "review_focus": "output block and final arrowhead endpoint",
+        "local_acceptance_checklist": [
+          "arrowhead lands on the output module left boundary",
+          "final segment stays horizontal before the arrowhead"
+        ]
       },
       {
         "id": "arrow_lane",
         "crop_type": "arrow-dense",
         "source_bbox_px": [270, 175, 625, 370],
         "target_bbox": [270, 175, 625, 370],
-        "review_focus": "90-degree bends are rounded without smoothing the straight lanes"
+        "review_focus": "90-degree bends are rounded without smoothing the straight lanes",
+        "local_acceptance_checklist": [
+          "rounded bends preserve the orthogonal route",
+          "connector has no spline wave or detached arrowhead"
+        ]
       },
       {
         "id": "label_check",
         "crop_type": "small-text",
         "source_bbox_px": [100, 160, 770, 390],
         "target_bbox": [100, 160, 770, 390],
-        "review_focus": "labels remain unwrapped and untranslated"
+        "review_focus": "labels remain unwrapped and untranslated",
+        "local_acceptance_checklist": [
+          "all labels remain single-line and unwrapped",
+          "connector does not pass through label text"
+        ]
       }
     ],
     "arrow_plan": [
@@ -137,6 +159,11 @@
         "source_bbox_px": [300, 180, 690, 360],
         "must_not_cross": ["middle_module"],
         "relative_position_facts": "horizontal lane, rounded down-up bend around middle module",
+        "geometry_contract": {
+          "endpoint_must_touch": true,
+          "target_boundary": "left",
+          "tolerance_px": 4
+        },
         "direction": "left_to_right",
         "certainty": "certain"
       }
@@ -171,7 +198,9 @@
       "text": "Branch",
       "style": {
         "fill": "#F8FAFC",
-        "line": "#475569"
+        "line": "#475569",
+        "rounding_in": 0.08,
+        "shadow": null
       }
     },
     {
@@ -184,7 +213,9 @@
       "text": "Avoid",
       "style": {
         "fill": "#EEF2FF",
-        "line": "#64748B"
+        "line": "#64748B",
+        "rounding_in": 0.08,
+        "shadow": null
       }
     },
     {
@@ -197,7 +228,9 @@
       "text": "Output",
       "style": {
         "fill": "#F8FAFC",
-        "line": "#475569"
+        "line": "#475569",
+        "rounding_in": 0.08,
+        "shadow": null
       }
     }
   ],
