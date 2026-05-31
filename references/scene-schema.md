@@ -977,7 +977,7 @@ Use `math_formula_group` for structured editable formulas with a visible fractio
 }
 ```
 
-Use `math_text` for short inline labels like `L_adv`; use `math_formula_group` when a real stacked fraction or aligned equation is visible. Tuning fields: `left_w_in`, `operator_w_in`, `fraction_w_in`, `fraction_font_size_pt`, `fraction_text_mode`, `baseline_y_ratio`, `fraction_bar_weight_pt`, `gap_in`, `numerator_gap_in`, and `denominator_gap_in`. Keep `fraction_text_mode: "tight_fragments"` for tight paper-style formulas with visible editable subscripts; use `"compact"` only when Unicode subscript rendering matches the source better, or `"fragments"` when maximum editability matters more than compact spacing.
+Use `math_text` for short inline labels like `L_adv`; use `math_formula_group` when a real stacked fraction or aligned equation is visible. Tuning fields: `left_w_in`, `operator_w_in`, `fraction_w_in`, `fraction_width_policy`, `fraction_padding_in`, `fraction_min_w_in`, `fraction_font_size_pt`, `fraction_text_mode`, `baseline_y_ratio`, `fraction_bar_weight_pt`, `gap_in`, `numerator_gap_in`, and `denominator_gap_in`. Default `fraction_width_policy: "fit_content"` keeps the fraction close to the equals sign instead of filling the whole formula box. Keep `fraction_text_mode: "tight_fragments"` for tight paper-style formulas with visible editable subscripts; use `"compact"` only when Unicode subscript rendering matches the source better, or `"fragments"` when maximum editability matters more than compact spacing.
 
 ### `math_label_box`
 

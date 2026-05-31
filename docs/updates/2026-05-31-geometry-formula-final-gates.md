@@ -25,6 +25,7 @@ The previous region-first update added the right workflow ideas, but three impor
 - Added `review_checklist_gate.py --final`, which fails final review if `region_scores` are missing, any region score is `not_reviewed`, or any region score remains `fail`.
 - Added `math_formula_group` to the component map, schema, style profiles, effective renderer fields, strict validation, and Visio renderer.
 - Implemented `math_formula_group` rendering as editable prefix/operator/fraction/suffix shapes with a stable fraction bar and compact fraction text mode.
+- Changed `math_formula_group` fraction width defaults to `fit_content`, so a stacked fraction stays close to the equals sign instead of filling the whole formula group and drifting far to the right.
 - Added `templates/examples/geometry_formula_contract.scene.json` to exercise geometry assertions and the new formula component together.
 
 ## Files Updated

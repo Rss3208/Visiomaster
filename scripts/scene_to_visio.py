@@ -2575,7 +2575,7 @@ def draw_tight_formula_text(
     text: str,
     style: dict[str, Any],
 ) -> Any:
-    fragments = parse_math_text_line(text)
+    fragments, widths, advances, total_w = tight_formula_text_metrics(text, style)
     if not fragments:
         return draw_text_box(page, page_height, x, y, width, height, "", merge_style(style, {"fill": "none", "line": "none"}))
     base_font = float(style.get("font_size_pt", 8.5) or 8.5)
@@ -2586,35 +2586,6 @@ def draw_tight_formula_text(
     subscript_offset = float(style.get("subscript_offset_in", base_font / 72.0 * 0.18) or 0.0)
     prime_offset_y = float(style.get("prime_offset_y_in", -base_font / 72.0 * 0.14) or 0.0)
     segment_gap = float(style.get("tight_segment_gap_in", 0.001) or 0.0)
-    min_w = float(style.get("tight_min_fragment_w_in", 0.014) or 0.014)
-    widths: list[float] = []
-    advances: list[float] = []
-    for index, fragment in enumerate(fragments):
-        raw = str(fragment.get("text", ""))
-        is_subscript = bool(fragment.get("subscript"))
-        is_prime = is_prime_fragment(raw)
-        font_size = base_font
-        if is_subscript:
-            font_size = subscript_font
-        elif is_prime:
-            font_size = max(1.0, base_font * 0.72)
-        text_w = approximate_text_width(raw, font_size)
-        next_is_subscript = index + 1 < len(fragments) and bool(fragments[index + 1].get("subscript"))
-        if is_subscript:
-            box_w = max(min_w, text_w * 1.45 + 0.012)
-            advance = max(min_w, text_w * 0.78 + 0.001)
-        elif is_prime:
-            box_w = max(min_w, text_w + 0.006)
-            advance = max(min_w, text_w * 0.70)
-        elif next_is_subscript and len(raw.strip()) == 1:
-            box_w = max(min_w, text_w * 1.24 + 0.008)
-            advance = max(min_w, text_w * 0.68)
-        else:
-            box_w = max(min_w, text_w * 1.45 + 0.018)
-            advance = max(min_w, text_w * 1.06 + 0.004)
-        widths.append(box_w)
-        advances.append(advance)
-    total_w = sum(advances) + max(0, len(advances) - 1) * segment_gap
     cursor_x = x + max(0.0, (width - total_w) / 2)
     text_style = merge_style(
         style,
@@ -2648,6 +2619,68 @@ def draw_tight_formula_text(
     return shape
 
 
+def tight_formula_text_metrics(text: str, style: dict[str, Any]) -> tuple[list[dict[str, Any]], list[float], list[float], float]:
+    fragments = parse_math_text_line(text)
+    if not fragments:
+        return [], [], [], 0.0
+    base_font = float(style.get("font_size_pt", 8.5) or 8.5)
+    subscript_scale = float(style.get("subscript_scale", 0.68) or 0.68)
+    subscript_font = max(1.0, base_font * subscript_scale)
+    segment_gap = float(style.get("tight_segment_gap_in", 0.001) or 0.0)
+    min_w = float(style.get("tight_min_fragment_w_in", 0.014) or 0.014)
+    widths: list[float] = []
+    advances: list[float] = []
+    for index, fragment in enumerate(fragments):
+        raw = str(fragment.get("text", ""))
+        is_subscript = bool(fragment.get("subscript"))
+        is_prime = is_prime_fragment(raw)
+        font_size = base_font
+        if is_subscript:
+            font_size = subscript_font
+        elif is_prime:
+            font_size = max(1.0, base_font * 0.72)
+        text_w = approximate_text_width(raw, font_size)
+        next_is_subscript = index + 1 < len(fragments) and bool(fragments[index + 1].get("subscript"))
+        if is_subscript:
+            box_w = max(min_w, text_w * 1.45 + 0.012)
+            advance = max(min_w, text_w * 0.78 + 0.001)
+        elif is_prime:
+            box_w = max(min_w, text_w + 0.006)
+            advance = max(min_w, text_w * 0.70)
+        elif next_is_subscript and len(raw.strip()) == 1:
+            box_w = max(min_w, text_w * 1.24 + 0.008)
+            advance = max(min_w, text_w * 0.68)
+        else:
+            box_w = max(min_w, text_w * 1.45 + 0.018)
+            advance = max(min_w, text_w * 1.06 + 0.004)
+        widths.append(box_w)
+        advances.append(advance)
+    cursor = 0.0
+    max_right = 0.0
+    for box_w, advance in zip(widths, advances):
+        max_right = max(max_right, cursor + box_w)
+        cursor += advance + segment_gap
+    return fragments, widths, advances, max_right
+
+
+def formula_fraction_width(numerator: str, denominator: str, small_style: dict[str, Any]) -> float:
+    mode = str(small_style.get("fraction_text_mode", "tight_fragments")).lower()
+    if mode in {"compact", "unicode", "single_box", "single_text"}:
+        return max(
+            approximate_text_width(compact_math_display_text(numerator), float(small_style.get("font_size_pt", 8.5) or 8.5)),
+            approximate_text_width(compact_math_display_text(denominator), float(small_style.get("font_size_pt", 8.5) or 8.5)),
+        )
+    if mode in {"fragment", "fragments", "editable_fragments", "tight", "tight_fragment", "tight_fragments"}:
+        return max(
+            tight_formula_text_metrics(numerator, small_style)[3],
+            tight_formula_text_metrics(denominator, small_style)[3],
+        )
+    return max(
+        approximate_text_width(numerator, float(small_style.get("font_size_pt", 8.5) or 8.5)),
+        approximate_text_width(denominator, float(small_style.get("font_size_pt", 8.5) or 8.5)),
+    )
+
+
 def draw_math_formula_group(page: Any, page_height: float, node: dict[str, Any], style: dict[str, Any]) -> Any:
     x = float(node["x"])
     y = float(node["y"])
@@ -2675,14 +2708,6 @@ def draw_math_formula_group(page: Any, page_height: float, node: dict[str, Any],
     right_w = float(node.get("right_w_in", 0) or 0)
     if right_text and right_w <= 0:
         right_w = min(width * 0.24, max(0.08, approximate_text_width(right_text, base_font) * 1.18))
-    reserved = padding_x * 2 + (left_w if left_text else 0) + (op_w if operator else 0) + (right_w if right_text else 0)
-    gaps = sum(1 for value in (left_text, operator, numerator or denominator, right_text) if value)
-    reserved += max(0, gaps - 1) * gap
-    frac_w = float(node.get("fraction_w_in", node.get("fraction_width_in", 0)) or 0)
-    if frac_w <= 0:
-        frac_w = max(0.12, width - reserved)
-    frac_w = min(max(0.08, frac_w), max(0.08, width - padding_x * 2))
-    cursor_x = x + padding_x
     text_style = merge_style(
         style,
         {
@@ -2700,6 +2725,23 @@ def draw_math_formula_group(page: Any, page_height: float, node: dict[str, Any],
         },
     )
     small_style = merge_style(text_style, {"font_size_pt": small_font, "min_font_size_pt": node.get("min_font_size_pt", style.get("min_font_size_pt", 4.5))})
+    fraction_text_mode = str(node.get("fraction_text_mode", style.get("fraction_text_mode", "tight_fragments"))).lower()
+    small_style = merge_style(small_style, {"fraction_text_mode": fraction_text_mode})
+    reserved = padding_x * 2 + (left_w if left_text else 0) + (op_w if operator else 0) + (right_w if right_text else 0)
+    gaps = sum(1 for value in (left_text, operator, numerator or denominator, right_text) if value)
+    reserved += max(0, gaps - 1) * gap
+    available_frac_w = max(0.08, width - reserved)
+    frac_w = float(node.get("fraction_w_in", node.get("fraction_width_in", 0)) or 0)
+    width_policy = str(node.get("fraction_width_policy", style.get("fraction_width_policy", "fit_content"))).lower()
+    if frac_w <= 0 and width_policy in {"fill", "fill_available", "remaining"}:
+        frac_w = max(0.12, available_frac_w)
+    elif frac_w <= 0:
+        content_w = formula_fraction_width(numerator, denominator, small_style)
+        fraction_padding = float(node.get("fraction_padding_in", style.get("fraction_padding_in", 0.045)) or 0.0)
+        min_frac_w = float(node.get("fraction_min_w_in", style.get("fraction_min_w_in", 0.28)) or 0.28)
+        frac_w = max(min_frac_w, content_w + fraction_padding * 2)
+    frac_w = min(max(0.08, frac_w), available_frac_w)
+    cursor_x = x + padding_x
     first_shape = None
 
     def keep(shape: Any) -> None:
@@ -2721,7 +2763,6 @@ def draw_math_formula_group(page: Any, page_height: float, node: dict[str, Any],
     denominator_h = max(0.04, small_font / 72.0 * 1.25)
     numerator_gap = float(node.get("numerator_gap_in", style.get("numerator_gap_in", 0.018)) or 0.018)
     denominator_gap = float(node.get("denominator_gap_in", style.get("denominator_gap_in", 0.016)) or 0.016)
-    fraction_text_mode = str(node.get("fraction_text_mode", style.get("fraction_text_mode", "tight_fragments"))).lower()
     if numerator:
         if fraction_text_mode in {"fragment", "fragments", "editable_fragments"}:
             keep(draw_math_text(page, page_height, {"x": frac_x, "y": bar_y - numerator_gap - numerator_h, "w": frac_w, "h": numerator_h, "text": numerator, "font_size_pt": small_font, "text_fit": "math_label"}, small_style))

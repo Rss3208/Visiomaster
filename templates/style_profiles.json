@@ -227,7 +227,10 @@
           "min_font_size_pt": 4.5,
           "baseline_y_ratio": 0.52,
           "fraction_bar_weight_pt": 0.8,
-          "gap_in": 0.035
+          "gap_in": 0.035,
+          "fraction_width_policy": "fit_content",
+          "fraction_padding_in": 0.045,
+          "fraction_min_w_in": 0.28
         },
         "tfr_panel": {
           "font_family": "Times New Roman",
@@ -726,7 +729,10 @@
           "min_font_size_pt": 4.5,
           "baseline_y_ratio": 0.52,
           "fraction_bar_weight_pt": 0.8,
-          "gap_in": 0.035
+          "gap_in": 0.035,
+          "fraction_width_policy": "fit_content",
+          "fraction_padding_in": 0.045,
+          "fraction_min_w_in": 0.28
         },
         "tfr_panel": {
           "font_family": "Cambria Math",
