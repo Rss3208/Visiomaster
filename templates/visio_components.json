@@ -1188,6 +1188,23 @@
         "neck_ratio": 0.1
       }
     },
+    "dimension_brace": {
+      "renderer": "bracket",
+      "default_style": {
+        "fill": "none",
+        "line": "#333333",
+        "line_weight_pt": 1.05,
+        "line_dash": "solid",
+        "shape": "paper_curly",
+        "curve_mode": "bezier",
+        "bezier_samples": 12,
+        "terminal_indent_ratio": 0.12,
+        "outer_bulge_ratio": 0.88,
+        "waist_indent_ratio": 0.1,
+        "neck_ratio": 0.08,
+        "lobe_ratio": 0.18
+      }
+    },
     "junction_point": {
       "renderer": "junction_point",
       "default_style": {

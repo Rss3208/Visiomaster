@@ -800,6 +800,15 @@ def audit_scene(scene: dict[str, Any]) -> str:
                 audit_items.append(
                     f"- [ ] `{node.get('id')}` is a large smooth brace; if the source crop has a short tight merge brace, set `brace_shape: \"source_like\"` or add `curve_tightness`, then lock tick positions."
                 )
+        if node_type == "bracket":
+            shape = str(node.get("shape", node.get("bracket_shape", ""))).lower()
+            width = float(node.get("w", 0) or 0)
+            height = float(node.get("h", 0) or 0)
+            aspect = max(width, height) / max(1e-9, min(width, height))
+            if exact_mode and shape in {"curly", "brace", "curly_brace"} and aspect >= 4.0:
+                audit_items.append(
+                    f"- [ ] `{node.get('id')}` is a high-aspect generic curly bracket; if it is a dimension/range marker, use `dimension_brace` or `shape: \"paper_curly\"` so it stays narrow instead of becoming wave-like."
+                )
         if node_type == "multi_port_junction":
             raw_ports = node.get("ports", node.get("port_positions", []))
             if isinstance(raw_ports, list) and raw_ports:

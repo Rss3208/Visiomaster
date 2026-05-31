@@ -29,7 +29,16 @@ CONTAINER_TYPES = {"group_container", "dashed_region", "loss_region", "audit_reg
 CURVED_EDGE_TYPES = {"curved_arrow", "loop_arrow"}
 CONTINUOUS_PATH_EDGE_TYPES = {"curved_arrow", "loop_arrow", "dashed_feedback_path"}
 RIBBON_ARROW_NODE_TYPES = {"ribbon_arrow", "curved_ribbon_arrow", "loop_ribbon_arrow", "qualitative_change_arrow"}
-VISUAL_GRAMMAR_NODE_TYPES = {"primitive_group", "shape_cluster", "symbol_group", "cell_strip", "micro_grid", "polyline_wave", *RIBBON_ARROW_NODE_TYPES}
+VISUAL_GRAMMAR_NODE_TYPES = {
+    "primitive_group",
+    "shape_cluster",
+    "symbol_group",
+    "cell_strip",
+    "micro_grid",
+    "polyline_wave",
+    "dimension_brace",
+    *RIBBON_ARROW_NODE_TYPES,
+}
 PRIMITIVE_FAMILIES = {
     "cell_strip",
     "polyline_wave",
@@ -2467,6 +2476,7 @@ NON_RENDERED_OR_TINY_TYPES = {
     "junction_point",
     "boundary_port",
     "bracket",
+    "dimension_brace",
     "merge_bus",
     "multi_port_junction",
     "boundary_fanout",
@@ -2482,6 +2492,7 @@ TEXT_OVERFLOW_SKIP_TYPES = {
     "feature_map_grid",
     "grid_matrix",
     "bracket",
+    "dimension_brace",
     "merge_bus",
     "multi_port_junction",
     "boundary_fanout",
@@ -2970,26 +2981,35 @@ def validate_scene(scene: dict, strict: bool = False) -> tuple[list[str], list[s
                     "do not combine a passive ellipse with detached arrowheads."
                 )
 
-        if node_type == "bracket":
+        if node_type in {"bracket", "dimension_brace"}:
             orientation = str(node.get("orientation", "right")).lower()
             if orientation not in {"left", "right", "up", "down"}:
                 errors.append(
-                    f"Bracket `{node_id}` has unsupported orientation `{orientation}`."
+                    f"{node_type} `{node_id}` has unsupported orientation `{orientation}`."
                 )
             tick_positions = node.get("tick_positions")
             if tick_positions is not None:
                 if not isinstance(tick_positions, list):
-                    errors.append(f"Bracket `{node_id}` tick_positions must be an array.")
+                    errors.append(f"{node_type} `{node_id}` tick_positions must be an array.")
                 else:
                     for index, tick in enumerate(tick_positions):
                         if not isinstance(tick, (int, float)) or not 0 <= float(tick) <= 1:
                             errors.append(
-                                f"Bracket `{node_id}` tick_positions[{index}] must be a number in [0, 1]."
+                                f"{node_type} `{node_id}` tick_positions[{index}] must be a number in [0, 1]."
                             )
-            for key in ("waist_ratio", "curl_ratio", "neck_ratio"):
+            ratio_keys = ("waist_ratio", "curl_ratio", "neck_ratio")
+            if node_type == "dimension_brace":
+                ratio_keys = (
+                    "terminal_indent_ratio",
+                    "outer_bulge_ratio",
+                    "waist_indent_ratio",
+                    "neck_ratio",
+                    "lobe_ratio",
+                )
+            for key in ratio_keys:
                 value = node.get(key)
                 if value is not None and (not isinstance(value, (int, float)) or not 0 <= float(value) <= 1):
-                    errors.append(f"Bracket `{node_id}` {key} must be a number in [0, 1].")
+                    errors.append(f"{node_type} `{node_id}` {key} must be a number in [0, 1].")
 
         if node_type == "brace_merge":
             orientation = str(node.get("orientation", "right")).lower()
@@ -3944,6 +3964,7 @@ def validate_scene(scene: dict, strict: bool = False) -> tuple[list[str], list[s
             "image_tile",
             "grid_matrix",
             "bracket",
+            "dimension_brace",
             "brace_merge",
             "concat_operator",
             "junction_point",

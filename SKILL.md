@@ -162,6 +162,8 @@ For source-visible thick arrows, do not normalize them into thin connectors:
 - cycle/update arrows that look like thick loop graphics use `loop_ribbon_arrow`
 - record the required arrow body/head geometry in `must_match_facts`, and place broad ribbon arrows on `layer: "arrow_under_text"` unless the source visibly places them above labels
 
+For source-visible dimension braces beside matrices, vertical stacks, tensors, timelines, or grouped rows/columns, use `dimension_brace` or `shape: "paper_curly"` instead of generic `shape: "curly"`. Generic curly braces are for merge/fusion-style grouping and can become visually wrong in high-aspect paper figures.
+
 Use rendering layers when arrows and text overlap in the source. `z` is unified across nodes, edges, and edge labels, so an edge with `layer: "arrow_under_text"` or a negative `z` can render behind labels. Use `foreground_arrow` only when the source visibly draws an arrow above other marks.
 
 Before authoring the first `edges` array for an exact replica, run a separate arrow-inventory pass from the source image. The goal is to lock topology before any Visio PNG exists. For arrow-dense local structures, this pass is not optional bookkeeping; it is the scene driver:
@@ -590,6 +592,7 @@ Supported node families:
 - `shape_cluster`
 - `primitive_group`
 - `bracket`
+- `dimension_brace`
 - `junction_point`
 - `image_tile`
 - `legend_block`
@@ -625,6 +628,7 @@ Why this matters:
 8. For rotated paper labels, use `text_block` with `angle_deg` instead of rotating text inside a process shape.
 9. For convolution kernels, receptive fields, masks, and other regular cell diagrams, use `grid_matrix`; do not manually author each square.
 10. For modality grouping marks such as `]`, `[`, `U`, and inverted `U`, use `bracket`; do not fake them with ultra-thin process boxes.
+10a. For thin high-aspect paper dimension braces beside a stack, matrix, tensor, timeline, or row/column group, use `dimension_brace` or `bracket` with `shape: "paper_curly"`. Do not use Unicode `{`/`}` glyphs, raster crops, or generic `shape: "curly"` when the source shows a narrow dimension/range brace.
 11. For 2-to-1, 3-to-1, or 1-to-many arrows, place a tiny `junction_point` at the merge/fan location, connect sources to the junction, then connect the junction to the destination.
 12. Do not connect arrows directly to `group_container`. Containers frame regions only; use a nearby `junction_point` or explicit node on the border when a callout line is needed.
 13. For brackets with a middle merge arm, set `tick_positions: [0, 0.5, 1]`; a plain two-arm bracket is not enough for modality merge symbols.

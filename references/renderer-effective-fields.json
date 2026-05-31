@@ -182,6 +182,46 @@
         "glyph_fill"
       ]
     },
+    "bracket": {
+      "effective_fields": [
+        "shape",
+        "orientation",
+        "curve_mode",
+        "bezier_samples",
+        "terminal_indent_ratio",
+        "outer_bulge_ratio",
+        "waist_indent_ratio",
+        "neck_ratio",
+        "lobe_ratio",
+        "source_visual_facts",
+        "must_match_facts"
+      ],
+      "weak_fields": [
+        "line",
+        "line_weight_pt",
+        "line_dash"
+      ]
+    },
+    "dimension_brace": {
+      "effective_fields": [
+        "shape",
+        "orientation",
+        "curve_mode",
+        "bezier_samples",
+        "terminal_indent_ratio",
+        "outer_bulge_ratio",
+        "waist_indent_ratio",
+        "neck_ratio",
+        "lobe_ratio",
+        "source_visual_facts",
+        "must_match_facts"
+      ],
+      "weak_fields": [
+        "line",
+        "line_weight_pt",
+        "line_dash"
+      ]
+    },
     "math_text": {
       "effective_fields": [
         "math_render_mode",

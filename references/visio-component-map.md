@@ -53,6 +53,7 @@ It uses a controlled semantic vocabulary so the analysis side stays stable while
 | `text_block` | free text label, including rotated paper labels | invisible text box |
 | `grid_matrix` | regular paper-style matrix/grid figure | editable cells plus grid lines |
 | `bracket` | side grouping bracket or U-shaped paper marker | editable line segments |
+| `dimension_brace` | paper-style dimension/grouping curly brace beside stacks, matrices, or columns | editable Bezier path |
 | `junction_point` | tiny merge/fan anchor for many-to-one routing | tiny oval, usually invisible |
 | `image_tile` | embedded secondary raster tile | imported image |
 | `legend_block` | legend/annotation block | rectangle |
@@ -167,6 +168,8 @@ For short internal arrows, use `arrow_size: "small"` on normal edges and `intern
 For waveform input strips and classifier endings, use `wave_signal`, `classifier_head`, and `boundary_fanout` before falling back to raster tiles. These components cover common paper-figure grammar while keeping the result editable.
 
 For input modality brackets and paper-side grouping marks, use `bracket` instead of skinny rectangles. If the bracket has a middle merge arm, set `tick_positions: [0, 0.5, 1]`.
+
+For source-visible dimension braces beside matrices, vertical stacks, tensors, timelines, or grouped rows/columns, use `dimension_brace` or `bracket` with `shape: "paper_curly"`. Use this when the brace is a thin single-sided range marker with no incoming merge lines. Use `brace_merge` only when the brace has many-to-one fusion/aggregation semantics, and use `bracket` for square/U-shaped brackets.
 
 For multimodal pipeline figures, preserve the visible lane grammar:
 - Use `image_tile` for source RGB/IR/SAR thumbnails when exact image content matters.

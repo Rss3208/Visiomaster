@@ -710,6 +710,7 @@ Use these components when the source crop contains small editable details rather
 - `operator_node`: small circles such as `+`, `×`, `⊗`, `r`, or activation gates.
 - `concat_operator`: visible `[]`/bracket concat marks or compact concat bars; add `ports`/`port_positions` when three or more inputs converge.
 - `brace_merge`: curly many-to-one braces; add `tick_positions`/`port_positions` for visible aligned merge ticks.
+- `dimension_brace`: thin paper-style curly dimension/grouping braces beside stacks, matrices, tensors, timelines, or grouped rows/columns.
 - `multi_port_junction`: explicit editable junction/bus spine when several arrows share one vertical or horizontal connection line.
 - `ribbon_arrow`, `curved_ribbon_arrow`, `loop_ribbon_arrow`: filled/thick arrows used as visual objects, not thin connectors.
 
@@ -1704,7 +1705,7 @@ In pixel-coordinate scenes, these `_in` layout fields may be authored in source 
 
 ### `bracket`
 
-Use `bracket` for modality grouping marks, braces, and paper-style side brackets. Do not fake these with ultra-thin `process_box` rectangles.
+Use `bracket` for modality grouping marks, square/U-shaped grouping marks, and legacy generic curly braces. Do not fake these with ultra-thin `process_box` rectangles.
 
 ```json
 {
@@ -1732,7 +1733,39 @@ Use `bracket` for modality grouping marks, braces, and paper-style side brackets
 
 Use `tick_positions` when the source bracket has a middle merge arm. Values are normalized from `0` to `1` along the bracket span. A left-side modality merge often needs `[0, 0.5, 1]`, not just `[0, 1]`.
 
-Set `shape: "curly"` for brace-like aggregation marks. Use the default straight bracket only when the source has square bracket geometry. A curly brace plus explicit `junction_point` or `boundary_port` nodes is preferred for many-to-one gate/fusion topology; do not fake a brace with a rotated parenthesis character.
+Set `shape: "curly"` for legacy/general brace-like aggregation marks. Use the default straight bracket only when the source has square bracket geometry. A curly brace plus explicit `junction_point` or `boundary_port` nodes is preferred for many-to-one gate/fusion topology; do not fake a brace with a rotated parenthesis character.
+
+### `dimension_brace`
+
+Use `dimension_brace` for thin paper-style dimension or grouping curly braces placed beside matrices, vertical stacks, tensors, timelines, or grouped rows/columns. It renders a single editable Bezier path using `shape: "paper_curly"` and stays narrow in high-aspect layouts, unlike generic `shape: "curly"` which remains the old/general behavior.
+
+```json
+{
+  "id": "stack_height_brace",
+  "type": "dimension_brace",
+  "x": 7.2,
+  "y": 3.4,
+  "w": 0.12,
+  "h": 1.8,
+  "orientation": "right",
+  "style": {
+    "line": "#000000",
+    "line_weight_pt": 1.05
+  },
+  "source_visual_facts": {
+    "shape": "thin single-sided paper curly dimension brace",
+    "opens_toward": "left"
+  },
+  "must_match_facts": [
+    "not S-shaped",
+    "single editable path",
+    "thin high-aspect brace",
+    "no arrowhead"
+  ]
+}
+```
+
+`dimension_brace` tuning fields are `orientation`, `curve_mode`, `bezier_samples`, `terminal_indent_ratio`, `outer_bulge_ratio`, `waist_indent_ratio`, `neck_ratio`, and `lobe_ratio`. Use `dimension_brace` or `bracket` with `shape: "paper_curly"` when the source brace annotates a dimension/range and has no merge-connector semantics. Use `brace_merge` when the brace is part of a many-to-one input/fusion topology.
 
 ### `brace_merge`
 
@@ -1755,7 +1788,7 @@ Use `brace_merge` for many-to-one curly merge braces near fusion/sum structures.
 }
 ```
 
-Use `bracket` for square/U-shaped grouping marks. Use `brace_merge` when the visual issue is a curly aggregation shape or when incoming branches need to meet a brace waist consistently.
+Use `bracket` for square/U-shaped grouping marks. Use `dimension_brace` for thin high-aspect paper dimension braces. Use `brace_merge` when the visual issue is a curly aggregation shape or when incoming branches need to meet a brace waist consistently.
 
 For source figures where the brace pinches inward at a plus/sum junction, set `brace_shape: "tight_curly"` and `waist_width_in` to pull the brace waist toward the junction. Use `tick_positions` for source-visible branch levels, and keep separate `junction_point` nodes for the actual connector merge.
 

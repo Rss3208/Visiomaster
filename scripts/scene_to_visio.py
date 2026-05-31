@@ -1254,6 +1254,37 @@ def catmull_rom_points(points: list[tuple[float, float]], samples_per_segment: i
     return smoothed
 
 
+def cubic_bezier_sample_points(points: list[tuple[float, float]], samples_per_curve: int = 12) -> list[tuple[float, float]]:
+    if len(points) < 4 or (len(points) - 1) % 3 != 0:
+        return points
+    samples = max(3, int(samples_per_curve))
+    sampled: list[tuple[float, float]] = [points[0]]
+    for index in range(1, len(points), 3):
+        if index + 2 >= len(points):
+            break
+        p0 = sampled[-1]
+        p1 = points[index]
+        p2 = points[index + 1]
+        p3 = points[index + 2]
+        for step in range(1, samples + 1):
+            t = step / samples
+            mt = 1.0 - t
+            x = (
+                mt * mt * mt * p0[0]
+                + 3 * mt * mt * t * p1[0]
+                + 3 * mt * t * t * p2[0]
+                + t * t * t * p3[0]
+            )
+            y = (
+                mt * mt * mt * p0[1]
+                + 3 * mt * mt * t * p1[1]
+                + 3 * mt * t * t * p2[1]
+                + t * t * t * p3[1]
+            )
+            sampled.append((x, y))
+    return sampled
+
+
 def rounded_orthogonal_points(
     points: list[tuple[float, float]],
     corner_radius: float,
@@ -5521,6 +5552,59 @@ def brace_points(
     raise ValueError(f"Unsupported bracket orientation: {orientation}")
 
 
+def paper_curly_brace_points(
+    x: float,
+    y: float,
+    width: float,
+    height: float,
+    orientation: str,
+    terminal_indent_ratio: float = 0.12,
+    outer_bulge_ratio: float = 0.88,
+    waist_indent_ratio: float = 0.10,
+    neck_ratio: float = 0.08,
+    lobe_ratio: float = 0.18,
+) -> list[tuple[float, float]]:
+    def clamp(value: float, low: float, high: float) -> float:
+        return max(low, min(high, float(value)))
+
+    g = clamp(terminal_indent_ratio, 0.00, 0.45)
+    o = clamp(outer_bulge_ratio, 0.55, 1.00)
+    c = clamp(waist_indent_ratio, 0.00, 0.45)
+    n = clamp(neck_ratio, 0.02, 0.30)
+    lobe = clamp(lobe_ratio, 0.06, 0.38)
+    orientation = str(orientation or "right").lower()
+
+    canonical = [
+        (g, 0.00),
+        (g, 0.02),
+        (o, 0.02),
+        (o, n),
+        (o, 0.50 - lobe),
+        (o, 0.50 - lobe * 0.35),
+        (c, 0.50),
+        (o, 0.50 + lobe * 0.35),
+        (o, 0.50 + lobe),
+        (o, 1.00 - n),
+        (o, 0.98),
+        (g, 0.98),
+        (g, 1.00),
+    ]
+
+    def transform(point: tuple[float, float]) -> tuple[float, float]:
+        u, v = point
+        if orientation == "right":
+            return x + u * width, y + v * height
+        if orientation == "left":
+            return x + (1.0 - u) * width, y + v * height
+        if orientation == "down":
+            return x + v * width, y + u * height
+        if orientation == "up":
+            return x + v * width, y + (1.0 - u) * height
+        raise ValueError(f"Unsupported bracket orientation: {orientation}")
+
+    return [transform(point) for point in canonical]
+
+
 def draw_brace_merge(page: Any, page_height: float, node: dict[str, Any], style: dict[str, Any]) -> Any:
     x = float(node["x"])
     y = float(node["y"])
@@ -5954,9 +6038,24 @@ def draw_bracket(page: Any, page_height: float, node: dict[str, Any], style: dic
     y = float(node["y"])
     width = float(node["w"])
     height = float(node["h"])
-    orientation = str(node.get("orientation", "right")).lower()
+    orientation = str(node.get("orientation", style.get("orientation", "right"))).lower()
     line_style = merge_style(style, {"fill": "none", "end_arrow": "none"})
     shape_kind = str(node.get("shape", node.get("bracket_shape", style.get("shape", "straight")))).lower()
+    if shape_kind in {"paper_curly", "dimension_brace", "latex_brace", "thin_curly"}:
+        points = paper_curly_brace_points(
+            x,
+            y,
+            width,
+            height,
+            orientation,
+            float(node.get("terminal_indent_ratio", style.get("terminal_indent_ratio", 0.12))),
+            float(node.get("outer_bulge_ratio", style.get("outer_bulge_ratio", 0.88))),
+            float(node.get("waist_indent_ratio", style.get("waist_indent_ratio", 0.10))),
+            float(node.get("neck_ratio", style.get("neck_ratio", 0.08))),
+            float(node.get("lobe_ratio", style.get("lobe_ratio", 0.18))),
+        )
+        curve_mode = str(node.get("curve_mode", style.get("curve_mode", "bezier"))).lower()
+        return draw_single_path(page, page_height, points, line_style, curve_mode)
     if shape_kind in {"curly", "brace", "curly_brace"}:
         points = brace_points(
             x,
@@ -6489,9 +6588,13 @@ def draw_single_path(
         samples = int(style.get("corner_samples", style.get("samples_per_corner", 5)) or 5)
         render_points = rounded_orthogonal_points(points, radius, samples)
 
-    values: list[float] = []
-    for x, y in render_points:
-        values.extend([float(x), to_visio_y(page_height, float(y))])
+    def path_values(path_points: list[tuple[float, float]]) -> list[float]:
+        values: list[float] = []
+        for x, y in path_points:
+            values.extend([float(x), to_visio_y(page_height, float(y))])
+        return values
+
+    values = path_values(render_points)
 
     tolerance = float(style.get("curve_tolerance", 0.0))
     shape = None
@@ -6502,6 +6605,9 @@ def draw_single_path(
             shape = None
 
     if shape is None:
+        if curve_mode == "bezier" and len(points) >= 4:
+            render_points = cubic_bezier_sample_points(points, int(style.get("bezier_samples", 12) or 12))
+            values = path_values(render_points)
         shape = draw_visio_polyline(page, values, tolerance)
 
     apply_style(shape, style)

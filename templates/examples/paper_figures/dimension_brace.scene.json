@@ -1,0 +1,226 @@
+{
+  "version": "0.1",
+  "metadata": {
+    "title": "Dimension brace component examples",
+    "style_profile": "paper_white",
+    "notes": [
+      "Tests paper_curly dimension braces as editable paths, not text glyphs or raster images.",
+      "Includes right and left braces at 4:1, 10:1, and 20:1 high-aspect ratios."
+    ],
+    "visual_grammar_inventory": {
+      "shape_facts": [
+        {
+          "role": "dimension_brace",
+          "form": "thin single-sided paper curly brace",
+          "must_not_render_as": ["S-shaped wave", "Unicode brace glyph", "raster image"]
+        }
+      ],
+      "cell_facts": ["simple stacked blocks used as brace targets"],
+      "line_facts": ["brace has no arrows and no tick marks"],
+      "symbol_facts": [],
+      "wave_facts": [],
+      "text_facts": ["small ratio labels are secondary"]
+    }
+  },
+  "page": {
+    "width": 900,
+    "height": 520,
+    "units": "px",
+    "origin": "top-left",
+    "target_width_in": 9,
+    "background": "#FFFFFF"
+  },
+  "assets": [],
+  "nodes": [
+    {
+      "id": "page_background",
+      "type": "page_background",
+      "x": 0,
+      "y": 0,
+      "w": 900,
+      "h": 520,
+      "z": -100
+    },
+    {
+      "id": "right_stack_4",
+      "type": "grid_matrix",
+      "x": 90,
+      "y": 70,
+      "w": 90,
+      "h": 120,
+      "rows": 4,
+      "cols": 3,
+      "cell_gap_in": 0,
+      "cell_rounding_in": 0,
+      "style": {"line": "#666666", "fill": "#F8FAFC", "line_weight_pt": 0.8}
+    },
+    {
+      "id": "right_brace_4",
+      "type": "dimension_brace",
+      "x": 192,
+      "y": 70,
+      "w": 30,
+      "h": 120,
+      "orientation": "right",
+      "style": {"line": "#111111", "line_weight_pt": 1.05},
+      "source_visual_facts": {"shape": "thin high-aspect paper curly dimension brace", "opens_toward": "left"},
+      "must_match_facts": ["not S-shaped", "single editable path", "no arrowhead"]
+    },
+    {
+      "id": "label_4",
+      "type": "text_block",
+      "x": 225,
+      "y": 115,
+      "w": 70,
+      "h": 28,
+      "text": "4:1",
+      "style": {"line": "none", "fill": "none", "font_size_pt": 12}
+    },
+    {
+      "id": "right_stack_10",
+      "type": "grid_matrix",
+      "x": 365,
+      "y": 45,
+      "w": 80,
+      "h": 160,
+      "rows": 8,
+      "cols": 3,
+      "cell_gap_in": 0,
+      "cell_rounding_in": 0,
+      "style": {"line": "#666666", "fill": "#F8FAFC", "line_weight_pt": 0.8}
+    },
+    {
+      "id": "right_brace_10",
+      "type": "dimension_brace",
+      "x": 456,
+      "y": 45,
+      "w": 16,
+      "h": 160,
+      "orientation": "right",
+      "style": {"line": "#111111", "line_weight_pt": 1.05},
+      "source_visual_facts": {"shape": "very narrow paper curly dimension brace", "opens_toward": "left"},
+      "must_match_facts": ["not S-shaped", "single editable path", "thin 10:1 brace", "no arrowhead"]
+    },
+    {
+      "id": "label_10",
+      "type": "text_block",
+      "x": 482,
+      "y": 110,
+      "w": 70,
+      "h": 28,
+      "text": "10:1",
+      "style": {"line": "none", "fill": "none", "font_size_pt": 12}
+    },
+    {
+      "id": "right_stack_20",
+      "type": "grid_matrix",
+      "x": 645,
+      "y": 25,
+      "w": 70,
+      "h": 200,
+      "rows": 10,
+      "cols": 3,
+      "cell_gap_in": 0,
+      "cell_rounding_in": 0,
+      "style": {"line": "#666666", "fill": "#F8FAFC", "line_weight_pt": 0.8}
+    },
+    {
+      "id": "right_brace_20",
+      "type": "dimension_brace",
+      "x": 725,
+      "y": 25,
+      "w": 10,
+      "h": 200,
+      "orientation": "right",
+      "style": {"line": "#111111", "line_weight_pt": 1.05},
+      "source_visual_facts": {"shape": "ultra-narrow paper curly dimension brace", "opens_toward": "left"},
+      "must_match_facts": ["not S-shaped", "single editable path", "thin 20:1 brace", "no arrowhead"]
+    },
+    {
+      "id": "label_20",
+      "type": "text_block",
+      "x": 748,
+      "y": 112,
+      "w": 70,
+      "h": 28,
+      "text": "20:1",
+      "style": {"line": "none", "fill": "none", "font_size_pt": 12}
+    },
+    {
+      "id": "left_stack_4",
+      "type": "grid_matrix",
+      "x": 125,
+      "y": 310,
+      "w": 90,
+      "h": 120,
+      "rows": 4,
+      "cols": 3,
+      "cell_gap_in": 0,
+      "cell_rounding_in": 0,
+      "style": {"line": "#666666", "fill": "#F8FAFC", "line_weight_pt": 0.8}
+    },
+    {
+      "id": "left_brace_4",
+      "type": "dimension_brace",
+      "x": 82,
+      "y": 310,
+      "w": 30,
+      "h": 120,
+      "orientation": "left",
+      "style": {"line": "#111111", "line_weight_pt": 1.05},
+      "source_visual_facts": {"shape": "thin high-aspect paper curly dimension brace", "opens_toward": "right"},
+      "must_match_facts": ["not S-shaped", "single editable path", "no arrowhead"]
+    },
+    {
+      "id": "left_stack_10",
+      "type": "grid_matrix",
+      "x": 392,
+      "y": 285,
+      "w": 80,
+      "h": 160,
+      "rows": 8,
+      "cols": 3,
+      "cell_gap_in": 0,
+      "cell_rounding_in": 0,
+      "style": {"line": "#666666", "fill": "#F8FAFC", "line_weight_pt": 0.8}
+    },
+    {
+      "id": "left_brace_10",
+      "type": "dimension_brace",
+      "x": 365,
+      "y": 285,
+      "w": 16,
+      "h": 160,
+      "orientation": "left",
+      "style": {"line": "#111111", "line_weight_pt": 1.05},
+      "source_visual_facts": {"shape": "very narrow paper curly dimension brace", "opens_toward": "right"},
+      "must_match_facts": ["not S-shaped", "single editable path", "thin 10:1 brace", "no arrowhead"]
+    },
+    {
+      "id": "left_stack_20",
+      "type": "grid_matrix",
+      "x": 670,
+      "y": 265,
+      "w": 70,
+      "h": 200,
+      "rows": 10,
+      "cols": 3,
+      "cell_gap_in": 0,
+      "cell_rounding_in": 0,
+      "style": {"line": "#666666", "fill": "#F8FAFC", "line_weight_pt": 0.8}
+    },
+    {
+      "id": "left_brace_20",
+      "type": "dimension_brace",
+      "x": 650,
+      "y": 265,
+      "w": 10,
+      "h": 200,
+      "orientation": "left",
+      "style": {"line": "#111111", "line_weight_pt": 1.05},
+      "source_visual_facts": {"shape": "ultra-narrow paper curly dimension brace", "opens_toward": "right"},
+      "must_match_facts": ["not S-shaped", "single editable path", "thin 20:1 brace", "no arrowhead"]
+    }
+  ],
+  "edges": []
+}
