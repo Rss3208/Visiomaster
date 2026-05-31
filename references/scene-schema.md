@@ -253,7 +253,7 @@ Rules for `arrow_plan`:
 - `loop_update` should use one continuous `loop_arrow`, not several line fragments plus a detached arrowhead.
 - `rounded_orthogonal` should use `rounded_orthogonal_connector` or `route: "rounded_orthogonal"` with an explicit corner radius. Do not map it to `smooth_curve`.
 - `scene_validate.py --strict` treats missing or violated arrow-plan bindings as errors.
-- Use `geometry_contract` when a source arrow has measurable visual geometry that must survive rendering. Supported contract fields include booleans such as `must_be_horizontal`, `must_be_vertical`, `start_y_equals_end_y`, `start_x_equals_end_x`, `endpoint_must_touch`, `must_touch_boundary`, `must_not_cross_text`; string fields such as `source_boundary`, `target_boundary`, `start_anchor`, `end_anchor`; and numeric tolerances such as `tolerance_px` or `tolerance_in`. This is an optional stricter contract for important arrows, not a replacement for `route_shape`.
+- Use `geometry_contract` when a source arrow has measurable visual geometry that must survive rendering. Supported contract fields include booleans such as `must_be_horizontal`, `must_be_vertical`, `start_y_equals_end_y`, `start_x_equals_end_x`, `endpoint_must_touch`, `must_touch_boundary`, `must_not_cross_text`; string fields such as `source_boundary`, `target_boundary`, `start_anchor`, `end_anchor`, `shared_bus_id`, and `shared_bus_axis`; and numeric tolerances such as `tolerance_px` or `tolerance_in`. This is an optional stricter contract for important arrows, not a replacement for `route_shape`. Run `scripts/scene_geometry_assert.py --strict` to enforce these contracts after the scene is authored.
 
 For local attention-like diagrams, record `metadata.local_motifs` or region-level motif facts before writing edges. Motif names can include `attention_score_motif`, `value_weighting_motif`, `residual_add_norm_motif`, and `concat_merge_motif`. Motif rules are source-level constraints, not decorative labels; for example Softmax in an attention-score motif is a floating label and should not become an edge endpoint.
 
@@ -954,6 +954,30 @@ For paper figures with dense labels such as `P_RGB`, `q_IR`, `f_tf`, `g_hrrp`, a
 Use `math_text` for hat notation such as `f̂` or `f\u0302`. Do not leave hat labels as ordinary `text_block`; the renderer treats hat fragments as math and overlays the hat mark so Visio does not substitute or split the glyph unpredictably.
 
 Use `math_text` or `formula_text_block` when the visible source line mixes natural language and inline math, such as `最后 token 嵌入 e_T` or `H=[h_1,...,h_T]`. Do not degrade those lines to a plain `text_block` if the math fragment alignment matters visually.
+
+### `math_formula_group`
+
+Use `math_formula_group` for structured editable formulas with a visible fraction bar, especially when the source shows an equation such as `ω = numerator / denominator`. This component keeps the prefix, equals sign, numerator, fraction bar, denominator, and optional suffix in one local formula group so baseline and fraction alignment do not drift as separate loose text boxes.
+
+```json
+{
+  "id": "omega_fraction",
+  "type": "math_formula_group",
+  "x": 280,
+  "y": 620,
+  "w": 260,
+  "h": 68,
+  "left_text": "ω",
+  "operator": "=",
+  "numerator": "exp(s_i)",
+  "denominator": "Σ_j exp(s_j)",
+  "baseline_y_ratio": 0.52,
+  "fraction_bar_weight_pt": 0.8,
+  "source_bbox_px": [560, 1240, 820, 1308]
+}
+```
+
+Use `math_text` for short inline labels like `L_adv`; use `math_formula_group` when a real stacked fraction or aligned equation is visible. Tuning fields: `left_w_in`, `operator_w_in`, `fraction_w_in`, `fraction_font_size_pt`, `fraction_text_mode`, `baseline_y_ratio`, `fraction_bar_weight_pt`, `gap_in`, `numerator_gap_in`, and `denominator_gap_in`. Keep `fraction_text_mode: "tight_fragments"` for tight paper-style formulas with visible editable subscripts; use `"compact"` only when Unicode subscript rendering matches the source better, or `"fragments"` when maximum editability matters more than compact spacing.
 
 ### `math_label_box`
 

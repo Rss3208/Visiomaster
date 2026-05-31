@@ -707,6 +707,33 @@
         "allow_inline_mixed_text": true
       }
     },
+    "math_formula_group": {
+      "renderer": "math_formula_group",
+      "default_style": {
+        "fill": "none",
+        "line": "none",
+        "text_color": "#111827",
+        "font_family": "Cambria Math",
+        "font_family_candidates": ["Cambria Math", "Times New Roman", "Cambria", "Microsoft YaHei UI"],
+        "font_role": "math",
+        "font_weight": "regular",
+        "font_size_pt": 12,
+        "fraction_font_size_pt": 8.5,
+        "fraction_text_mode": "tight_fragments",
+        "text_fit": "math_label",
+        "min_font_size_pt": 4.5,
+        "baseline_y_ratio": 0.52,
+        "fraction_bar_weight_pt": 0.8,
+        "gap_in": 0.035,
+        "padding_x_in": 0.01,
+        "numerator_gap_in": 0.018,
+        "denominator_gap_in": 0.016,
+        "math_render_mode": "fragments",
+        "subscript_scale": 0.72,
+        "subscript_offset_in": 0.035,
+        "allow_inline_mixed_text": true
+      }
+    },
     "tfr_panel": {
       "renderer": "tfr_panel",
       "default_style": {

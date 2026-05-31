@@ -270,12 +270,15 @@ For exact replicas, run the rebuild gate after each rendered iteration:
 
 ```powershell
 python ${SKILL_DIR}\scripts\scene_validate.py <scene.json> --strict
+python ${SKILL_DIR}\scripts\scene_geometry_assert.py <scene.json> --strict
 python ${SKILL_DIR}\scripts\scene_audit.py <scene.json> --fail-on-rebuild
 ```
 
 In strict mode, missing `source_visual_inventory`, missing `region_plan`, template-seeded starts, and recipe-rewritten exact scenes are treated as gate failures, not informal warnings. If validate/audit prints a blocking contract failure or `[REBUILD]` item, stop coordinate nudging. Rebuild that local subsystem with the correct semantic component (`loop_arrow`, `dashed_region`, `dashed_feedback_path`, `boundary_port`, etc.) before doing any more visual polishing.
 
 In strict mode, missing `metadata.arrow_plan`, missing `arrow_plan_id` bindings, or route-shape violations are also gate failures. Do not render a strict replica whose long arrows still rely on center-to-center `auto` routing when the source shows fixed horizontal, vertical, boundary, merge, fork, feedback, or loop grammar.
+
+When `metadata.arrow_plan[].geometry_contract` is present, run `scene_geometry_assert.py --strict` before final delivery. Use it for deterministic checks such as `start_y_equals_end_y`, `start_x_equals_end_x`, `endpoint_must_touch`, `target_boundary`, `source_boundary`, and shared bus alignment through `shared_bus_id` / `shared_bus_axis`.
 
 For exact replica work, validation passing is necessary but not sufficient. Render a PNG and compare it with the source for:
 - page aspect ratio
@@ -380,6 +383,8 @@ python ${SKILL_DIR}\scripts\review_checklist_gate.py `
   --require-failed-refs `
   --output-report <review_checklist_gate.json>
 ```
+
+For final strict/region-first delivery, add `--final`. This fails if `region_scores` is missing, if any region score is still `not_reviewed`, or if a region remains failed.
 
 Then generate the rebuild brief with checklist enforcement:
 
@@ -606,6 +611,7 @@ Why this matters:
 39. Use `polygon_node` only when the shape cannot be expressed by `trapezoid_node`, `cuboid_node`, `notched_block`, or another semantic primitive. Include normalized points when authoring in source-pixel scenes.
 40. For formula/vector annotations such as `q = [q_RGB, q_IR, q_SAR]^T`, use `math_vector` instead of a plain multi-line `text_block`. This keeps brackets, entries, and the optional prefix aligned as editable shapes/text. Do not make formula labels connector endpoints.
 40a. For small variables and formula labels such as `g_tf`, `g_hrrp`, `f_fused`, `P_RGB`, `q_IR`, `s1`, `f1`, or `L_adv`, use `math_text` with `math_render_mode: "fragments"` and `text_fit: "math_label"` when the subscript has uppercase or word-like tokens. `compact_unicode` is allowed only for digit or true-subscript lowercase labels that visually match the source. Never leave them as raw text that Visio can wrap into `g_ / tf`, `f_fu / sed`, or superscript-like `RGB`.
+40b. For structured formulas with a visible fraction bar, such as `ω = numerator / denominator`, use `math_formula_group` instead of several loose `math_text` nodes. It keeps the equals sign, fraction bar, numerator, denominator, and optional suffix as one editable formula group with stable baseline alignment.
 41. For wide multi-panel figures, create `audit_region` nodes for every titled panel even when the visible frame is drawn with `group_container`; this lets `scene_audit.py` review inputs, outputs, and cross-panel arrows panel by panel.
 42. For large source images, use `metadata.region_strategy: "region_first"` or `"tiled_subscenes"` before rendering. Also add `metadata.region_plan` entries for global/input/core/output/arrow-dense/small-text/boundary areas, each with `source_bbox_px` and a target bbox/container. If the figure is too complex to reason about at full-page scale, author each region as a local subscene, validate it, then copy the region nodes into the full scene with the same style tokens.
 42a. Apply the region-first rule before full-scene authoring when a strict/exact source has 30+ visible nodes, 35+ visible arrows/edges, 5+ tiny formulas, 3+ arrow-dense subsystems, or a very wide paper layout. Write `metadata.region_plan[].review_focus` and `metadata.region_plan[].local_acceptance_checklist` before detailed node authoring. Small diagrams can stay single-scene.
@@ -645,7 +651,7 @@ Why this matters:
 74. For exact or GAN/TFR renders, do not call `scene_to_visio.py` as a blind final step. Run the rebuild gate first, or let the renderer's built-in gate stop the export when `[REBUILD]` items remain.
 75. If a dashed feedback path looks like a tiny isolated arrow fragment, treat that as a semantic-route failure, not a cosmetic issue. Rebuild it as one `dashed_feedback_path` or a bus/port route instead of preserving the fragment.
 76. Before writing edges for exact replicas, produce `metadata.arrow_plan` from source-image visual inspection. Then bind each source-visible edge with `arrow_plan_id`; run `scene_validate.py --strict` before rendering so missing arrows, diagonal drift, wrong boundary endpoints, fragmented feedback paths, and broken loop arrows fail early.
-76a. For source arrows with strict geometry, add `geometry_contract` inside the `arrow_plan` entry. Use it for facts such as `must_be_horizontal`, `must_be_vertical`, `start_y_equals_end_y`, `start_x_equals_end_x`, `target_boundary`, `endpoint_must_touch`, `must_touch_boundary`, and `tolerance_px`. This is stronger than a vague route label and lets review compare visible endpoints instead of arguing about intent.
+76a. For source arrows with strict geometry, add `geometry_contract` inside the `arrow_plan` entry. Use it for facts such as `must_be_horizontal`, `must_be_vertical`, `start_y_equals_end_y`, `start_x_equals_end_x`, `target_boundary`, `source_boundary`, `endpoint_must_touch`, `must_touch_boundary`, `shared_bus_id`, `shared_bus_axis`, and `tolerance_px`. This is stronger than a vague route label and lets `scene_geometry_assert.py` compare visible endpoints instead of arguing about intent.
 76b. Do a typography pass for exact replicas. Identify whether the source uses serif, sans, math, mono, CJK, or mixed typography before finalizing nodes; do not let every text node inherit a generic default by accident.
 76c. Do a `visual_grammar_inventory` pass before component selection. First write source facts for shapes, cells, lines, symbols, waves, and text; only then choose renderer components.
 76d. For repeated small rectangular cells, use `cell_strip` or `micro_grid` with explicit `cell_count`/`rows`/`cols`, `cell_gap_in`, and `cell_rounding_in`. Do not use rounded token/grid defaults when the source facts say rectangular, continuous, or low rounding.

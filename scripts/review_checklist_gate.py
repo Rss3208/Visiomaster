@@ -76,8 +76,16 @@ def validate_items(items: list[dict[str, Any]], kind: str, failures: list[str], 
     return ids
 
 
-def validate_region_scores(value: object, failures: list[str], warnings: list[str]) -> tuple[int, list[str]]:
+def validate_region_scores(
+    value: object,
+    failures: list[str],
+    warnings: list[str],
+    *,
+    final: bool = False,
+) -> tuple[int, list[str]]:
     if value is None:
+        if final:
+            failures.append("Final review requires `region_scores`.")
         return 0, []
     if not isinstance(value, list):
         failures.append("`region_scores` must be an array when provided.")
@@ -110,6 +118,8 @@ def validate_region_scores(value: object, failures: list[str], warnings: list[st
                 failures.append(f"{label} scores.{key} has invalid value `{scores.get(key)}`.")
             if status == "fail":
                 region_failed = True
+            if final and status == "not_reviewed":
+                failures.append(f"{label} scores.{key} is not_reviewed in final mode.")
         blocking = item.get("blocking_findings", [])
         if blocking is None:
             blocking = []
@@ -118,6 +128,8 @@ def validate_region_scores(value: object, failures: list[str], warnings: list[st
             blocking = []
         if region_failed and not blocking:
             failures.append(f"{label} has a fail score but no blocking_findings.")
+        if final and region_failed:
+            failures.append(f"{label} has a fail score in final mode.")
         if region_failed and region_id:
             failed_regions.append(region_id)
     return len(value), sorted(set(failed_regions))
@@ -128,6 +140,7 @@ def main() -> int:
     parser.add_argument("findings", help="Path to review_findings.json")
     parser.add_argument("--manifest", help="Optional review_manifest.json; used to verify local original path.")
     parser.add_argument("--require-failed-refs", action="store_true", help="Require non-acceptable findings to cite checklist_refs.")
+    parser.add_argument("--final", action="store_true", help="Require region_scores and fail if any critical region score is fail or not_reviewed.")
     parser.add_argument("--allow-missing-local-original", action="store_true", help="Do not fail when original_path is missing or non-local.")
     parser.add_argument("--output-report", help="Optional JSON report path.")
     args = parser.parse_args()
@@ -149,7 +162,7 @@ def main() -> int:
     ids = validate_items(topology, "topology_checklist", failures, warnings)
     ids |= validate_items(visual, "visual_checklist", failures, warnings)
     ids |= validate_items(fidelity, "fidelity_checklist", failures, warnings)
-    region_score_count, failed_regions = validate_region_scores(doc.get("region_scores"), failures, warnings)
+    region_score_count, failed_regions = validate_region_scores(doc.get("region_scores"), failures, warnings, final=args.final)
     failed_ids = {
         str(item.get("id", "")).strip()
         for item in topology + visual + fidelity

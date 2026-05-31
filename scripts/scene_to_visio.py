@@ -905,7 +905,7 @@ def compact_math_display_text(text: str) -> str:
         prime = match.group(3) or ""
         return f"{base}{subscript}{prime}"
 
-    return re.sub(r"([A-Za-z])_([A-Za-z0-9_]+)([′']*)", replace_subscript, text)
+    return re.sub(r"([A-Za-zα-ωΑ-Ω])_([A-Za-z0-9_]+)([′']*)", replace_subscript, text)
 
 
 def fragments_to_compact_math_text(line: list[dict[str, Any]]) -> str:
@@ -995,7 +995,7 @@ def parse_math_text_line(line: str) -> list[dict[str, Any]]:
     line = normalize_loss_formula_text(line)
     fragments: list[dict[str, Any]] = []
     cursor = 0
-    for match in re.finditer(r"([A-Za-z])_([A-Za-z0-9_]+)([′']*)", line):
+    for match in re.finditer(r"([A-Za-zα-ωΑ-Ω])_([A-Za-z0-9_]+)([′']*)", line):
         if match.start() > cursor:
             fragments.extend(parse_plain_math_segment(line[cursor : match.start()]))
         base = match.group(1)
@@ -2522,6 +2522,227 @@ def draw_math_text(page: Any, page_height: float, node: dict[str, Any], style: d
         cursor_y += line_height + line_gap
 
     return shape
+
+
+def fraction_text(value: Any) -> str:
+    if isinstance(value, dict):
+        return str(value.get("text", value.get("value", "")))
+    return str(value or "")
+
+
+def draw_compact_formula_text(
+    page: Any,
+    page_height: float,
+    x: float,
+    y: float,
+    width: float,
+    height: float,
+    text: str,
+    style: dict[str, Any],
+) -> Any:
+    compact_text = compact_math_display_text(text)
+    return draw_text_box(
+        page,
+        page_height,
+        x,
+        y,
+        width,
+        height,
+        compact_text,
+        single_line_text_style(
+            merge_style(
+                style,
+                {
+                    "fill": "none",
+                    "line": "none",
+                    "text_margin_in": 0.0,
+                    "text_fit": "math_label",
+                    "font_italic": style.get("font_italic", True),
+                },
+            ),
+            min_font_size_pt=float(style.get("min_font_size_pt", 4.5) or 4.5),
+        ),
+    )
+
+
+def draw_tight_formula_text(
+    page: Any,
+    page_height: float,
+    x: float,
+    y: float,
+    width: float,
+    height: float,
+    text: str,
+    style: dict[str, Any],
+) -> Any:
+    fragments = parse_math_text_line(text)
+    if not fragments:
+        return draw_text_box(page, page_height, x, y, width, height, "", merge_style(style, {"fill": "none", "line": "none"}))
+    base_font = float(style.get("font_size_pt", 8.5) or 8.5)
+    subscript_scale = float(style.get("subscript_scale", 0.68) or 0.68)
+    subscript_font = max(1.0, base_font * subscript_scale)
+    line_h = max(0.04, base_font / 72.0 * 1.25)
+    base_y = y + max(0.0, (height - line_h) / 2)
+    subscript_offset = float(style.get("subscript_offset_in", base_font / 72.0 * 0.18) or 0.0)
+    prime_offset_y = float(style.get("prime_offset_y_in", -base_font / 72.0 * 0.14) or 0.0)
+    segment_gap = float(style.get("tight_segment_gap_in", 0.001) or 0.0)
+    min_w = float(style.get("tight_min_fragment_w_in", 0.014) or 0.014)
+    widths: list[float] = []
+    advances: list[float] = []
+    for index, fragment in enumerate(fragments):
+        raw = str(fragment.get("text", ""))
+        is_subscript = bool(fragment.get("subscript"))
+        is_prime = is_prime_fragment(raw)
+        font_size = base_font
+        if is_subscript:
+            font_size = subscript_font
+        elif is_prime:
+            font_size = max(1.0, base_font * 0.72)
+        text_w = approximate_text_width(raw, font_size)
+        next_is_subscript = index + 1 < len(fragments) and bool(fragments[index + 1].get("subscript"))
+        if is_subscript:
+            box_w = max(min_w, text_w * 1.45 + 0.012)
+            advance = max(min_w, text_w * 0.78 + 0.001)
+        elif is_prime:
+            box_w = max(min_w, text_w + 0.006)
+            advance = max(min_w, text_w * 0.70)
+        elif next_is_subscript and len(raw.strip()) == 1:
+            box_w = max(min_w, text_w * 1.24 + 0.008)
+            advance = max(min_w, text_w * 0.68)
+        else:
+            box_w = max(min_w, text_w * 1.45 + 0.018)
+            advance = max(min_w, text_w * 1.06 + 0.004)
+        widths.append(box_w)
+        advances.append(advance)
+    total_w = sum(advances) + max(0, len(advances) - 1) * segment_gap
+    cursor_x = x + max(0.0, (width - total_w) / 2)
+    text_style = merge_style(
+        style,
+        {
+            "fill": "none",
+            "line": "none",
+            "text_align": 0,
+            "vertical_align": 1,
+            "text_margin_in": 0.0,
+            "text_fit": "math_label",
+        },
+    )
+    shape = None
+    for fragment, box_w, advance in zip(fragments, widths, advances):
+        raw = str(fragment.get("text", ""))
+        is_subscript = bool(fragment.get("subscript"))
+        is_prime = is_prime_fragment(raw)
+        font_size = subscript_font if is_subscript else (max(1.0, base_font * 0.72) if is_prime else base_font)
+        fragment_y = base_y + (subscript_offset if is_subscript else (prime_offset_y if is_prime else 0.0))
+        shape = draw_text_box(
+            page,
+            page_height,
+            cursor_x,
+            fragment_y,
+            box_w,
+            line_h,
+            raw,
+            merge_style(text_style, {"font_size_pt": font_size}),
+        )
+        cursor_x += advance + segment_gap
+    return shape
+
+
+def draw_math_formula_group(page: Any, page_height: float, node: dict[str, Any], style: dict[str, Any]) -> Any:
+    x = float(node["x"])
+    y = float(node["y"])
+    width = float(node["w"])
+    height = float(node["h"])
+    base_font = float(node.get("font_size_pt", style.get("font_size_pt", 12)) or 12)
+    small_font = float(node.get("fraction_font_size_pt", style.get("fraction_font_size_pt", max(5.5, base_font * 0.72))) or max(5.5, base_font * 0.72))
+    line_weight = float(node.get("fraction_bar_weight_pt", style.get("fraction_bar_weight_pt", 0.8)) or 0.8)
+    left_text = str(node.get("left_text", node.get("prefix", "")))
+    operator = str(node.get("operator", "=" if left_text else node.get("equation_operator", "")))
+    right_text = str(node.get("right_text", node.get("suffix", "")))
+    fraction = node.get("fraction") if isinstance(node.get("fraction"), dict) else {}
+    numerator = fraction_text(node.get("numerator", fraction.get("numerator")))
+    denominator = fraction_text(node.get("denominator", fraction.get("denominator")))
+    baseline_ratio = float(node.get("baseline_y_ratio", style.get("baseline_y_ratio", 0.52)) or 0.52)
+    baseline_y = y + height * baseline_ratio
+    padding_x = float(node.get("padding_x_in", style.get("padding_x_in", 0.01)) or 0.0)
+    gap = float(node.get("gap_in", style.get("gap_in", 0.035)) or 0.035)
+    left_w = float(node.get("left_w_in", 0) or 0)
+    if left_text and left_w <= 0:
+        left_w = min(width * 0.28, max(0.08, approximate_text_width(left_text, base_font) * 1.18))
+    op_w = float(node.get("operator_w_in", 0) or 0)
+    if operator and op_w <= 0:
+        op_w = min(width * 0.16, max(0.07, approximate_text_width(operator, base_font) * 1.22))
+    right_w = float(node.get("right_w_in", 0) or 0)
+    if right_text and right_w <= 0:
+        right_w = min(width * 0.24, max(0.08, approximate_text_width(right_text, base_font) * 1.18))
+    reserved = padding_x * 2 + (left_w if left_text else 0) + (op_w if operator else 0) + (right_w if right_text else 0)
+    gaps = sum(1 for value in (left_text, operator, numerator or denominator, right_text) if value)
+    reserved += max(0, gaps - 1) * gap
+    frac_w = float(node.get("fraction_w_in", node.get("fraction_width_in", 0)) or 0)
+    if frac_w <= 0:
+        frac_w = max(0.12, width - reserved)
+    frac_w = min(max(0.08, frac_w), max(0.08, width - padding_x * 2))
+    cursor_x = x + padding_x
+    text_style = merge_style(
+        style,
+        {
+            "fill": "none",
+            "line": "none",
+            "font_size_pt": base_font,
+            "font_role": node.get("font_role", style.get("font_role", "math")),
+            "font_family": node.get("font_family", style.get("font_family", "Cambria Math")),
+            "font_family_candidates": node.get("font_family_candidates", style.get("font_family_candidates", ["Cambria Math", "Times New Roman", "Cambria"])),
+            "text_fit": "math_label",
+            "text_margin_in": 0.0,
+            "font_italic": node.get("font_italic", style.get("font_italic", True)),
+            "text_align": 1,
+            "vertical_align": 1,
+        },
+    )
+    small_style = merge_style(text_style, {"font_size_pt": small_font, "min_font_size_pt": node.get("min_font_size_pt", style.get("min_font_size_pt", 4.5))})
+    first_shape = None
+
+    def keep(shape: Any) -> None:
+        nonlocal first_shape
+        if first_shape is None:
+            first_shape = shape
+
+    center_line_h = max(0.04, base_font / 72.0 * 1.35)
+    if left_text:
+        keep(draw_math_text(page, page_height, {"x": cursor_x, "y": baseline_y - center_line_h / 2, "w": left_w, "h": center_line_h, "text": left_text, "font_size_pt": base_font, "text_fit": "math_label"}, text_style))
+        cursor_x += left_w + gap
+    if operator:
+        keep(draw_text_box(page, page_height, cursor_x, baseline_y - center_line_h / 2, op_w, center_line_h, operator, merge_style(text_style, {"font_italic": False})))
+        cursor_x += op_w + gap
+
+    frac_x = cursor_x
+    bar_y = baseline_y
+    numerator_h = max(0.04, small_font / 72.0 * 1.25)
+    denominator_h = max(0.04, small_font / 72.0 * 1.25)
+    numerator_gap = float(node.get("numerator_gap_in", style.get("numerator_gap_in", 0.018)) or 0.018)
+    denominator_gap = float(node.get("denominator_gap_in", style.get("denominator_gap_in", 0.016)) or 0.016)
+    fraction_text_mode = str(node.get("fraction_text_mode", style.get("fraction_text_mode", "tight_fragments"))).lower()
+    if numerator:
+        if fraction_text_mode in {"fragment", "fragments", "editable_fragments"}:
+            keep(draw_math_text(page, page_height, {"x": frac_x, "y": bar_y - numerator_gap - numerator_h, "w": frac_w, "h": numerator_h, "text": numerator, "font_size_pt": small_font, "text_fit": "math_label"}, small_style))
+        elif fraction_text_mode in {"tight", "tight_fragment", "tight_fragments"}:
+            keep(draw_tight_formula_text(page, page_height, frac_x, bar_y - numerator_gap - numerator_h, frac_w, numerator_h, numerator, small_style))
+        else:
+            keep(draw_compact_formula_text(page, page_height, frac_x, bar_y - numerator_gap - numerator_h, frac_w, numerator_h, numerator, small_style))
+    bar_style = merge_style(style, {"line": node.get("fraction_bar_color", style.get("line", "#111827")), "line_weight_pt": line_weight, "end_arrow": "none"})
+    keep(draw_line_segment(page, page_height, (frac_x, bar_y), (frac_x + frac_w, bar_y), bar_style))
+    if denominator:
+        if fraction_text_mode in {"fragment", "fragments", "editable_fragments"}:
+            keep(draw_math_text(page, page_height, {"x": frac_x, "y": bar_y + denominator_gap, "w": frac_w, "h": denominator_h, "text": denominator, "font_size_pt": small_font, "text_fit": "math_label"}, small_style))
+        elif fraction_text_mode in {"tight", "tight_fragment", "tight_fragments"}:
+            keep(draw_tight_formula_text(page, page_height, frac_x, bar_y + denominator_gap, frac_w, denominator_h, denominator, small_style))
+        else:
+            keep(draw_compact_formula_text(page, page_height, frac_x, bar_y + denominator_gap, frac_w, denominator_h, denominator, small_style))
+    cursor_x = frac_x + frac_w + gap
+    if right_text:
+        keep(draw_math_text(page, page_height, {"x": cursor_x, "y": baseline_y - center_line_h / 2, "w": right_w, "h": center_line_h, "text": right_text, "font_size_pt": base_font, "text_fit": "math_label"}, text_style))
+
+    return first_shape or draw_text_box(page, page_height, x, y, width, height, "", merge_style(style, {"fill": "none", "line": "none"}))
 
 
 def default_tfr_cells(rows: int, cols: int) -> list[list[Any]]:
@@ -5868,6 +6089,8 @@ def draw_node(
             shape = draw_math_label_box(page, page_height, node, style)
         elif render_kind == "math_text":
             shape = draw_math_text(page, page_height, node, style)
+        elif render_kind == "math_formula_group":
+            shape = draw_math_formula_group(page, page_height, node, style)
         elif render_kind == "tfr_panel":
             shape = draw_tfr_panel(page, page_height, node, style)
         elif render_kind == "loss_region":
@@ -5963,6 +6186,7 @@ def draw_node(
         "math_vector",
         "math_label_box",
         "math_text",
+        "math_formula_group",
         "tfr_panel",
         "loss_region",
         "token_grid",
@@ -6462,6 +6686,7 @@ def run_rebuild_gate(scene_path: Path) -> None:
         audit_path = Path(temp_dir) / "scene.audit.md"
         commands = [
             [sys.executable, str(scripts_dir / "scene_validate.py"), str(scene_path), "--strict"],
+            [sys.executable, str(scripts_dir / "scene_geometry_assert.py"), str(scene_path), "--strict"],
             [
                 sys.executable,
                 str(scripts_dir / "scene_audit.py"),

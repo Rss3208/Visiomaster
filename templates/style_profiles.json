@@ -216,6 +216,19 @@
           "math_render_mode": "fragments",
           "allow_inline_mixed_text": true
         },
+        "math_formula_group": {
+          "font_family": "Times New Roman",
+          "font_family_candidates": ["Times New Roman", "Cambria Math", "Cambria", "Microsoft YaHei UI"],
+          "font_role": "math",
+          "font_size_pt": 12,
+          "fraction_font_size_pt": 8.5,
+          "fraction_text_mode": "tight_fragments",
+          "text_fit": "math_label",
+          "min_font_size_pt": 4.5,
+          "baseline_y_ratio": 0.52,
+          "fraction_bar_weight_pt": 0.8,
+          "gap_in": 0.035
+        },
         "tfr_panel": {
           "font_family": "Times New Roman",
           "font_family_candidates": ["Times New Roman", "Cambria", "Georgia"],
@@ -701,6 +714,19 @@
           "min_font_size_pt": 5.5,
           "math_render_mode": "fragments",
           "allow_inline_mixed_text": true
+        },
+        "math_formula_group": {
+          "font_family": "Cambria Math",
+          "font_family_candidates": ["Cambria Math", "Cambria", "Times New Roman", "Microsoft YaHei UI"],
+          "font_role": "math",
+          "font_size_pt": 12,
+          "fraction_font_size_pt": 8.5,
+          "fraction_text_mode": "tight_fragments",
+          "text_fit": "math_label",
+          "min_font_size_pt": 4.5,
+          "baseline_y_ratio": 0.52,
+          "fraction_bar_weight_pt": 0.8,
+          "gap_in": 0.035
         },
         "tfr_panel": {
           "font_family": "Cambria Math",

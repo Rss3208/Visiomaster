@@ -43,6 +43,7 @@ It uses a controlled semantic vocabulary so the analysis side stays stable while
 | `modality_spine` | vertical shared-response or availability-mask bus with repeated side ports | editable spine rectangle plus port boxes |
 | `math_vector` | compact formula/vector annotation such as `q=[q_RGB,q_IR,q_SAR]^T` | editable prefix text, bracket strokes, and entry text |
 | `math_text` | short inline math labels such as GAN `L_adv` / `L_rec` losses | editable text fragments with smaller lowered subscript fragments |
+| `math_formula_group` | structured formulas with visible fraction bars, such as `ω = numerator / denominator` | editable prefix/operator/fraction text plus a stable fraction bar |
 | `tfr_panel` | Real/Generated/Reconstructed TFR paper module | editable rounded panel with title, subtitle, grid, input label, and optional internal arrow |
 | `operator_node` | plus/multiply/tensor/add gate or explicit operator | editable oval with symbol text |
 | `boundary_port` | module-frame input/output anchor | small visible/invisible port |

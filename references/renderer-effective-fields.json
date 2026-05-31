@@ -195,6 +195,34 @@
         "text_color"
       ]
     },
+    "math_formula_group": {
+      "effective_fields": [
+        "left_text",
+        "operator",
+        "right_text",
+        "numerator",
+        "denominator",
+        "fraction",
+        "left_w_in",
+        "operator_w_in",
+        "right_w_in",
+        "fraction_w_in",
+        "fraction_font_size_pt",
+        "fraction_text_mode",
+        "baseline_y_ratio",
+        "fraction_bar_weight_pt",
+        "gap_in",
+        "padding_x_in",
+        "numerator_gap_in",
+        "denominator_gap_in",
+        "font_size_pt",
+        "source_font_family"
+      ],
+      "weak_fields": [
+        "text_color",
+        "fraction_bar_color"
+      ]
+    },
     "caption_block": {
       "effective_fields": [
         "runs",

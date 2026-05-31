@@ -192,24 +192,40 @@ def is_internal_edge(edge: dict[str, Any]) -> bool:
     return edge_visual_role(edge) in INTERNAL_EDGE_ROLES
 
 
-def region_label_text(region: dict[str, Any], *, include_required_crop_types: bool = False) -> str:
+def region_label_text(
+    region: dict[str, Any],
+    *,
+    include_required_crop_types: bool = False,
+    include_review_focus: bool = True,
+) -> str:
     values = [
         region.get("id", ""),
         region.get("name", ""),
         region.get("crop_type", ""),
         region.get("review_crop_type", ""),
-        region.get("review_focus", ""),
     ]
+    if include_review_focus:
+        values.append(region.get("review_focus", ""))
     if include_required_crop_types and isinstance(region.get("required_crop_types"), list):
         values.extend(str(item) for item in region.get("required_crop_types", []) if isinstance(item, str))
     return " ".join(str(value) for value in values).lower()
 
 
 def region_categories(region: dict[str, Any], *, include_required_crop_types: bool = False) -> set[str]:
-    text = region_label_text(region, include_required_crop_types=include_required_crop_types)
+    header_text = region_label_text(
+        region,
+        include_required_crop_types=include_required_crop_types,
+        include_review_focus=False,
+    )
+    focus_text = region_label_text(
+        region,
+        include_required_crop_types=False,
+        include_review_focus=True,
+    )
     categories: set[str] = set()
     for category, tokens in STRICT_REGION_CATEGORY_TOKENS.items():
-        if any(token in text for token in tokens):
+        haystack = focus_text if category in {"global", "input", "core", "output", "caption"} else header_text
+        if any(token in haystack for token in tokens):
             categories.add(category)
     return categories
 
@@ -374,8 +390,8 @@ def node_text_for_font(node: dict) -> str:
 
 
 RUN_TEXT_NODE_TYPES = {"text_block", "annotation_block", "caption_block"}
-MATH_CONTRACT_NODE_TYPES = {"math_text", "formula_text_block", "math_label_box", "math_vector"}
-TEXT_ROUTE_OVERLAP_NODE_TYPES = RUN_TEXT_NODE_TYPES | {"math_text", "math_label_box", "formula_text_block"}
+MATH_CONTRACT_NODE_TYPES = {"math_text", "formula_text_block", "math_label_box", "math_vector", "math_formula_group"}
+TEXT_ROUTE_OVERLAP_NODE_TYPES = RUN_TEXT_NODE_TYPES | {"math_text", "math_label_box", "formula_text_block", "math_formula_group"}
 TEXT_FIT_WIDTH_MODES = {"shrink", "shrink_to_fit", "fit", "single_line", "no_wrap", "nowrap", "math_label"}
 TEXT_FIT_HEIGHT_MODES = {"shrink", "shrink_to_fit", "fit", "multi_line"}
 TEXT_FIT_SINGLE_LINE_MODES = {"single_line", "no_wrap", "nowrap", "math_label"}
@@ -1055,6 +1071,31 @@ def visual_grammar_node_findings(
                     warnings.append(
                         f"{node_type} `{node_id}` subshape line/path {index} has no subshape_role; mark it symbol_internal/icon_internal so arrow audit does not treat it as a main connector."
                     )
+
+    if node_type == "math_formula_group":
+        formula_kind = str(node.get("formula_kind", node.get("kind", ""))).lower()
+        if formula_kind and formula_kind not in {"fraction", "ratio", "stacked_fraction", "inline_group", "equation"}:
+            errors.append(f"math_formula_group `{node_id}` formula_kind `{formula_kind}` is unsupported.")
+        has_fraction = any(node.get(key) for key in ("numerator", "denominator", "fraction"))
+        if has_fraction or formula_kind in {"fraction", "ratio", "stacked_fraction"}:
+            fraction = node.get("fraction")
+            if fraction is not None and not isinstance(fraction, dict):
+                errors.append(f"math_formula_group `{node_id}` fraction must be an object.")
+            numerator = node.get("numerator")
+            denominator = node.get("denominator")
+            if isinstance(fraction, dict):
+                numerator = numerator or fraction.get("numerator")
+                denominator = denominator or fraction.get("denominator")
+            if not numerator:
+                errors.append(f"math_formula_group `{node_id}` fraction requires numerator.")
+            if not denominator:
+                errors.append(f"math_formula_group `{node_id}` fraction requires denominator.")
+        if node.get("parts") is not None and not isinstance(node.get("parts"), list):
+            errors.append(f"math_formula_group `{node_id}` parts must be an array.")
+        for key in ("fraction_bar_weight_pt", "baseline_y_ratio", "fraction_width_ratio"):
+            value = node.get(key)
+            if value is not None and not isinstance(value, (int, float)):
+                errors.append(f"math_formula_group `{node_id}` {key} must be numeric.")
 
     return warnings, errors
 
@@ -2903,6 +2944,8 @@ def validate_scene(scene: dict, strict: bool = False) -> tuple[list[str], list[s
             errors.append(f"Node `{node_id}` references missing asset `{asset_ref}`.")
 
         has_text = bool(str(node.get("text", node.get("symbol", ""))).strip())
+        if node_type == "math_formula_group" and any(node.get(key) for key in ("left_text", "operator", "numerator", "denominator", "right_text", "fraction")):
+            has_text = True
         if (
             node_type in {"process_box", "rounded_process"}
             and not has_text
@@ -3930,6 +3973,7 @@ def validate_scene(scene: dict, strict: bool = False) -> tuple[list[str], list[s
             "math_vector",
             "math_label_box",
             "math_text",
+            "math_formula_group",
             "tfr_panel",
             *RIBBON_ARROW_NODE_TYPES,
         }
