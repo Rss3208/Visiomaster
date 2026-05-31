@@ -18,6 +18,15 @@ REGION_SCORE_KEYS = {
     "text_overlap",
     "unexpected_grid_or_dash",
 }
+STRICT_DENSE_REQUIRED_CROP_TYPES = {
+    "arrow_dense",
+    "formula_dense",
+    "rotated_text",
+    "small_text",
+    "legend",
+    "paper_3d",
+    "output_label",
+}
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -46,6 +55,91 @@ def string_list(value: object) -> list[str]:
     if isinstance(value, list):
         return [str(item).strip() for item in value if str(item).strip()]
     return []
+
+
+def crop_tokens_from_text(value: object) -> set[str]:
+    text = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if not text:
+        return set()
+    tokens = {token for token in text.split("_") if token}
+    joined = text
+    result: set[str] = set()
+    if "arrow_dense" in joined or ("arrow" in tokens and "dense" in tokens):
+        result.add("arrow_dense")
+    if "formula_dense" in joined or ("formula" in tokens and "dense" in tokens):
+        result.add("formula_dense")
+    if "rotated_text" in joined or ("rotated" in tokens and "text" in tokens):
+        result.add("rotated_text")
+    if "small_text" in joined or ("small" in tokens and "text" in tokens):
+        result.add("small_text")
+    if "legend" in tokens or "legend" in joined:
+        result.add("legend")
+    if "paper_3d" in joined or "3d" in tokens or "cuboid" in tokens or "slab" in tokens:
+        result.add("paper_3d")
+    if "output_label" in joined or ("output" in tokens and "label" in tokens):
+        result.add("output_label")
+    return result
+
+
+def region_score_crop_types(item: dict[str, Any]) -> set[str]:
+    found: set[str] = set()
+    categories = item.get("categories")
+    if isinstance(categories, list):
+        for category in categories:
+            found |= crop_tokens_from_text(category)
+    for key in ("region_id", "review_focus", "focus_region", "crop_type", "review_crop_type"):
+        found |= crop_tokens_from_text(item.get(key))
+    return found
+
+
+def manifest_required_crop_types(manifest: dict[str, Any] | None, required: set[str]) -> set[str]:
+    if not manifest:
+        return set()
+    found: set[str] = set()
+    for list_key in ("region_scores", "regions"):
+        rows = manifest.get(list_key)
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            found |= region_score_crop_types(row)
+            if "region" in row:
+                found |= crop_tokens_from_text(row.get("region"))
+    return found & required
+
+
+def validate_required_crop_reviews(
+    findings_doc: dict[str, Any],
+    manifest_doc: dict[str, Any] | None,
+    required: set[str],
+    failures: list[str],
+    warnings: list[str],
+) -> None:
+    if not required:
+        return
+    rows = findings_doc.get("region_scores")
+    if not isinstance(rows, list):
+        failures.append("Required crop review cannot be checked because `region_scores` is missing.")
+        return
+
+    expected = manifest_required_crop_types(manifest_doc, required) if manifest_doc else set()
+    if not expected:
+        expected = required
+        if not manifest_doc:
+            warnings.append("No manifest was provided; enforcing all requested crop types against findings region_scores.")
+
+    covered: set[str] = set()
+    for item in rows:
+        if isinstance(item, dict):
+            covered |= region_score_crop_types(item)
+    missing = sorted(expected - covered)
+    if missing:
+        failures.append(
+            "Final strict dense review is missing region_scores coverage for required crop type(s): "
+            + ", ".join(missing)
+            + "."
+        )
 
 
 def validate_items(items: list[dict[str, Any]], kind: str, failures: list[str], warnings: list[str]) -> set[str]:
@@ -141,12 +235,23 @@ def main() -> int:
     parser.add_argument("--manifest", help="Optional review_manifest.json; used to verify local original path.")
     parser.add_argument("--require-failed-refs", action="store_true", help="Require non-acceptable findings to cite checklist_refs.")
     parser.add_argument("--final", action="store_true", help="Require region_scores and fail if any critical region score is fail or not_reviewed.")
+    parser.add_argument(
+        "--strict-dense",
+        action="store_true",
+        help="In final mode, require strict/dense crop type coverage for arrow/formula/text/legend/3D/output details.",
+    )
+    parser.add_argument(
+        "--require-crop-types",
+        nargs="*",
+        help="Explicit crop types that must appear in final region_scores, for example arrow_dense formula_dense legend.",
+    )
     parser.add_argument("--allow-missing-local-original", action="store_true", help="Do not fail when original_path is missing or non-local.")
     parser.add_argument("--output-report", help="Optional JSON report path.")
     args = parser.parse_args()
 
     findings_path = Path(args.findings).resolve()
     doc = load_json(findings_path)
+    manifest_doc = load_json(Path(args.manifest).resolve()) if args.manifest else None
     failures: list[str] = []
     warnings: list[str] = []
 
@@ -186,10 +291,18 @@ def main() -> int:
         if args.require_failed_refs and severity in {"blocking", "important", "general"} and failed_ids and not refs:
             failures.append(f"{finding_id} must cite checklist_refs.")
 
+    required_crop_types: set[str] = set()
+    if args.strict_dense and args.final:
+        required_crop_types |= STRICT_DENSE_REQUIRED_CROP_TYPES
+    if args.require_crop_types is not None:
+        required_crop_types |= {str(item).strip().lower().replace("-", "_") for item in args.require_crop_types if str(item).strip()}
+    if required_crop_types:
+        validate_required_crop_reviews(doc, manifest_doc, required_crop_types, failures, warnings)
+
     reviewer_inputs = doc.get("reviewer_inputs") if isinstance(doc.get("reviewer_inputs"), dict) else {}
     original_path = reviewer_inputs.get("original_path") if isinstance(reviewer_inputs, dict) else None
     if not original_path and args.manifest:
-        manifest = load_json(Path(args.manifest).resolve())
+        manifest = manifest_doc or {}
         manifest_inputs = manifest.get("reviewer_inputs")
         if isinstance(manifest_inputs, dict):
             original_path = manifest_inputs.get("original_path") or manifest_inputs.get("original")
@@ -213,6 +326,7 @@ def main() -> int:
         "region_score_count": region_score_count,
         "failed_checklist_ids": sorted(failed_ids),
         "failed_regions": failed_regions,
+        "required_crop_types": sorted(required_crop_types),
     }
     if args.output_report:
         output_path = Path(args.output_report).resolve()

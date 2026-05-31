@@ -141,6 +141,8 @@ Use `polyline_wave` for source-specific waveforms and signal silhouettes. Provid
 
 Use `ribbon_arrow` / `curved_ribbon_arrow` / `loop_ribbon_arrow` when the source arrow is a filled or very thick graphic. Ordinary connectors are for thin lines; they should not replace broad qualitative-change arrows, infographic bands, or loop arrows that visually sit behind labels. Put broad arrows on `layer: "arrow_under_text"` unless the source places them above text.
 
+For strict dense paper figures, calibrate arrow families before authoring nodes. `metadata.style_calibration.forward_arrow` controls filled/solid ribbon arrows, while `metadata.style_calibration.feedback_arrow` controls dashed or backprop arrows. Do not let dashed feedback arrows inherit filled-arrow body widths, large arrowheads, or sparse dash rhythms unless the source visibly shows that scale. Legend arrow samples should use `metadata.style_calibration.legend.inner_arrow_scale` instead of copying main-diagram arrow dimensions.
+
 Use `symbol_group`, `shape_cluster`, or `primitive_group` for composed symbols and small local structures. Provide `subshapes` when the built-in `symbol_kind` is not enough. Subshape `bbox` values are local `[x, y, w, h]` values relative to the parent bbox when between 0 and 1.
 
 For merge/fan connectors, do not draw several arrows directly into the same box edge when the source has a visible shared trunk. Add a `junction_point` at the merge/fan position, route source arrows into that point without arrowheads, then route one final arrow to the destination.

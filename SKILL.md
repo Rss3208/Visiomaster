@@ -101,18 +101,56 @@ Record the inventory in `metadata.source_visual_inventory` before the first rend
 - per-region `source_bbox_px`, required visible labels/formulas, component motifs, edge motifs, port/boundary/dashed-frame notes, uncertainty notes, and text layout facts.
 - per-region `fidelity_obligations` for details that must not be simplified away, with `object`, `must_preserve`, `allowed_simplification`, and `forbidden_simplification` fields.
 
+For strict dense replicas, add `metadata.style_calibration` before detailed authoring. This is the style contract that stops DANN-like figures from inheriting the wrong arrow thickness, dash rhythm, formula-box size, legend scale, or rotated-label scale from unrelated parts of the page. Required groups depend on the visible source content:
+- `forward_arrow`: `body_width_px`, `head_width_px`, `head_length_px`, `fill`, `outline_weight_px`, `shadow_offset_px`
+- `feedback_arrow`: `stroke_width_px`, `dash_length_px`, `dash_gap_px`, `arrowhead_px`, `curve_smoothness`, `z_policy`
+- `formula_box`: `typical_bbox_px`, `corner_radius_px`, `padding_px`, `fraction_bar_weight_px`, `math_font_role`, `line_spacing_policy`
+- `text_scale`: `body_label_pt`, `output_label_pt`, `branch_caption_pt`, `rotated_label_pt`, `formula_pt`, `legend_pt`
+- `paper_3d_block`: `front_fill`, `side_fill`, `top_fill`, `hatch_density`, `shadow_offset_px`, `outline_weight_px`
+- `legend`: `frame_weight_px`, `inner_arrow_scale`, `formula_sample_scale`, `text_baseline_policy`
+
 Before choosing components, add a mandatory `metadata.visual_grammar_inventory` pass. Components are rendering grammar, not recognition conclusions. The source visual facts decide the component parameters; components must not normalize source-specific variation into a standard template.
 
 Record facts such as:
 
 ```json
 "visual_grammar_inventory": {
-  "shape_facts": ["thin rounded rectangle", "small filled circle", "outlined triangle"],
-  "cell_facts": ["continuous rectangular cells", "5 columns", "low rounding", "thin grid line"],
-  "line_facts": ["solid horizontal", "dashed orthogonal", "arrowhead at end", "thick ribbon arrow"],
+  "shape_facts": [
+    {
+      "role": "formula_box",
+      "form": "small rounded rectangle",
+      "relative_size": "compact",
+      "must_not_render_as": ["large empty callout", "plain multiline text"]
+    }
+  ],
+  "cell_facts": [
+    {
+      "role": "feature_cells",
+      "form": "continuous rectangular cells",
+      "count": 5,
+      "rounding": "low",
+      "must_not_render_as": ["rounded token_grid", "loose process boxes"]
+    }
+  ],
+  "line_facts": [
+    {
+      "role": "feedback_arrow",
+      "form": "curved dashed arrow",
+      "dash_rhythm": "short_dense",
+      "relative_width": "thin_to_medium",
+      "arrowhead": "small_black_triangle",
+      "must_not_render_as": ["long_sparse_dash_blocks", "oversized_black_ribbon"]
+    }
+  ],
   "symbol_facts": ["circle plus", "triangle gate", "circular refresh arrow"],
   "wave_facts": ["polyline-like", "single peak", "noisy high frequency"],
-  "text_facts": ["single-line math", "bold centered title", "small multiline label"]
+  "text_facts": [
+    {
+      "role": "output_label",
+      "form": "single-line label",
+      "must_not_render_as": ["wrapped label", "opposite rotation direction"]
+    }
+  ]
 }
 ```
 
@@ -270,11 +308,12 @@ For exact replicas, run the rebuild gate after each rendered iteration:
 
 ```powershell
 python ${SKILL_DIR}\scripts\scene_validate.py <scene.json> --strict
+python ${SKILL_DIR}\scripts\style_calibration_gate.py <scene.json> --strict
 python ${SKILL_DIR}\scripts\scene_geometry_assert.py <scene.json> --strict
 python ${SKILL_DIR}\scripts\scene_audit.py <scene.json> --fail-on-rebuild
 ```
 
-In strict mode, missing `source_visual_inventory`, missing `region_plan`, template-seeded starts, and recipe-rewritten exact scenes are treated as gate failures, not informal warnings. If validate/audit prints a blocking contract failure or `[REBUILD]` item, stop coordinate nudging. Rebuild that local subsystem with the correct semantic component (`loop_arrow`, `dashed_region`, `dashed_feedback_path`, `boundary_port`, etc.) before doing any more visual polishing.
+In strict mode, missing `source_visual_inventory`, missing `region_plan`, missing strict-dense `style_calibration`, template-seeded starts, and recipe-rewritten exact scenes are treated as gate failures, not informal warnings. If validate/audit/style gates print a blocking contract failure or `[REBUILD]` item, stop coordinate nudging. Rebuild that local subsystem with the correct semantic component (`loop_arrow`, `dashed_region`, `dashed_feedback_path`, `boundary_port`, calibrated ribbon arrows, structured formula groups, etc.) before doing any more visual polishing.
 
 In strict mode, missing `metadata.arrow_plan`, missing `arrow_plan_id` bindings, or route-shape violations are also gate failures. Do not render a strict replica whose long arrows still rely on center-to-center `auto` routing when the source shows fixed horizontal, vertical, boundary, merge, fork, feedback, or loop grammar.
 
@@ -333,6 +372,7 @@ For exact replicas, the first render is allowed to be a fast editable reconstruc
 - The visual-layout checklist records overlap, label wrapping, bracket/tensor spacing, line-through-text defects, feature-stack thickness, font-role drift, and color/rounding/shadow mismatches.
 - The fidelity-obligation checklist records "must not simplify" details from `fidelity_obligations`, such as worker limbs/helmets, crossed tools, neural-network node-link marks, ribbon-arrow body/head geometry, or dense icon internals.
 - For region-first scenes, the review findings should also include `region_scores`. Each region should be judged on arrow direction, endpoint connection, line geometry, formula fidelity, text overlap, and unexpected grid/dash fragments. A region with a `fail` score needs a concrete `blocking_findings` item or it is not actionable.
+- For strict dense replicas, full-page-only review is insufficient when these crop types exist: `arrow_dense`, `formula_dense`, `rotated_text`, `small_text`, `legend`, `paper_3d`, and `output_label`. Each one needs local visual review evidence and `region_scores`; in final mode, use `review_checklist_gate.py --final --strict-dense` so missing local coverage is treated as a review defect.
 - A finding should reference the failed checklist item when possible. Do not write only broad notes such as "right output is wrong" when a specific missing branch, wrong landing point, or bracket overlap is visible.
 - Repair rounds must re-check the same crop and checklist items, not only rerun validation or no-op gates.
 
@@ -484,6 +524,12 @@ Treat these as blocking defects in strict replica mode:
 - long paper-flow segments that stay diagonal
 - concat/operator syntax rendered with the wrong component family
 - repeated strips, panels, or tensor geometry still depending on hidden defaults instead of explicit scene contract
+- rotated text has the wrong angle sign or reads in the opposite visual direction from the source
+- source single-line labels wrap into multiple lines
+- legend arrows/formula samples inherit main-diagram scale and become too heavy
+- feedback dashed arrows have visibly wrong dash rhythm or oversized arrowheads
+- formula boxes are more than about 20% larger/smaller than the same source role
+- a formula box, arrowhead, or rotated label is visibly placed in the opposite whitespace relationship from the source
 
 For cross-module flow, do not connect large modules center-to-center by default. Use boundary ports, buses, trunks, junctions, or explicit side anchors. For math-like text, do not keep it on plain `text_block` just because the font looks close enough; use `math_text`, `formula_text_block`, or run-based math fragments.
 
@@ -654,6 +700,7 @@ Why this matters:
 76a. For source arrows with strict geometry, add `geometry_contract` inside the `arrow_plan` entry. Use it for facts such as `must_be_horizontal`, `must_be_vertical`, `start_y_equals_end_y`, `start_x_equals_end_x`, `target_boundary`, `source_boundary`, `endpoint_must_touch`, `must_touch_boundary`, `source_node`, `target_node`, `shared_bus_id`, `shared_bus_axis`, `shared_bus_point`, and `tolerance_px`. This is stronger than a vague route label and lets `scene_geometry_assert.py` compare visible raw endpoints and routed endpoints instead of arguing about intent.
 76b. Do a typography pass for exact replicas. Identify whether the source uses serif, sans, math, mono, CJK, or mixed typography before finalizing nodes; do not let every text node inherit a generic default by accident.
 76c. Do a `visual_grammar_inventory` pass before component selection. First write source facts for shapes, cells, lines, symbols, waves, and text; only then choose renderer components.
+76c1. For strict dense figures, write `metadata.style_calibration` before detailed node authoring and run `style_calibration_gate.py --strict` before export. Do not let feedback arrows, formula boxes, legend samples, paper 3D blocks, rotated labels, or output labels inherit unrelated main-diagram scale.
 76d. For repeated small rectangular cells, use `cell_strip` or `micro_grid` with explicit `cell_count`/`rows`/`cols`, `cell_gap_in`, and `cell_rounding_in`. Do not use rounded token/grid defaults when the source facts say rectangular, continuous, or low rounding.
 76e. For waveform-like details whose local silhouette matters, use `polyline_wave` with explicit `points` or `samples`. Do not let exact replicas fall back to a generic sine wave.
 76f. For small icon-like structures made from circles, triangles, plus/cross marks, arcs, or local decorative lines, use `symbol_group`, `shape_cluster`, or `primitive_group` with `subshapes`. Mark internal lines with `subshape_role`/`edge_role` such as `symbol_internal`, `icon_internal`, or `decorative_internal` so topology audit does not mistake icon geometry for main flow.

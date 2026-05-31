@@ -281,16 +281,33 @@ def visual_grammar_checklist(scene: dict[str, object] | None) -> list[dict[str, 
             for fact in facts:
                 if not str(fact).strip():
                     continue
+                if isinstance(fact, dict):
+                    role = str(fact.get("role", category)).strip() or category
+                    source_parts = [
+                        str(fact.get(key, "")).strip()
+                        for key in ("form", "shape", "count", "rounding", "dash_rhythm", "relative_width", "arrowhead")
+                        if str(fact.get(key, "")).strip()
+                    ]
+                    source_expectation = "; ".join(source_parts) or str(fact)
+                    forbidden = fact.get("must_not_render_as")
+                    repair_hint = "Preserve this source visual fact through component parameters."
+                    if isinstance(forbidden, list) and forbidden:
+                        repair_hint += " Must not render as: " + ", ".join(str(item) for item in forbidden) + "."
+                else:
+                    role = category
+                    source_expectation = str(fact)
+                    repair_hint = "Preserve this source visual fact through component parameters, not by normalizing to a default template."
                 items.append(
                     {
                         "id": f"V{counter:03d}",
                         "kind": "visual_grammar",
                         "category": category,
-                        "focus_region": "source_visual_grammar",
-                        "source_fact": str(fact),
-                        "source_expectation": str(fact),
+                        "role": role,
+                        "focus_region": role if role != category else "source_visual_grammar",
+                        "source_fact": source_expectation,
+                        "source_expectation": source_expectation,
                         "replica_status": "not_reviewed",
-                        "repair_hint": "Preserve this source visual fact through component parameters, not by normalizing to a default template.",
+                        "repair_hint": repair_hint,
                         "status": "uncertain",
                         "certainty": "certain",
                     }

@@ -6727,6 +6727,7 @@ def run_rebuild_gate(scene_path: Path) -> None:
         audit_path = Path(temp_dir) / "scene.audit.md"
         commands = [
             [sys.executable, str(scripts_dir / "scene_validate.py"), str(scene_path), "--strict"],
+            [sys.executable, str(scripts_dir / "style_calibration_gate.py"), str(scene_path), "--strict"],
             [sys.executable, str(scripts_dir / "scene_geometry_assert.py"), str(scene_path), "--strict"],
             [
                 sys.executable,

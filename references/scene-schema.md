@@ -141,18 +141,113 @@ Rules for `source_visual_inventory`:
 - Use old scenes and old visual reviews only as failure evidence. A new capability evaluation scene should be authored fresh from this inventory.
 - A batch script may export multiple already-authored scenes, but a batch script that writes all scenes is not evidence that the skill can reconstruct new images from visual analysis.
 
+For strict dense replicas, add `metadata.style_calibration` before detailed authoring. This is mandatory when the scene is strict/exact and region-first, arrow-dense, formula-dense, or wide/dense enough that local styles can drift.
+
+```json
+{
+  "metadata": {
+    "style_calibration": {
+      "forward_arrow": {
+        "body_width_px": 48,
+        "head_width_px": 110,
+        "head_length_px": 68,
+        "fill": "#111111",
+        "outline_weight_px": 1,
+        "shadow_offset_px": 0
+      },
+      "feedback_arrow": {
+        "stroke_width_px": 6,
+        "dash_length_px": 18,
+        "dash_gap_px": 12,
+        "arrowhead_px": 22,
+        "curve_smoothness": "source_sampled",
+        "z_policy": "behind_text"
+      },
+      "formula_box": {
+        "typical_bbox_px": [150, 72],
+        "corner_radius_px": 8,
+        "padding_px": [10, 6],
+        "fraction_bar_weight_px": 2,
+        "math_font_role": "math",
+        "line_spacing_policy": "tight_fraction"
+      },
+      "text_scale": {
+        "body_label_pt": 12,
+        "output_label_pt": 13,
+        "branch_caption_pt": 10,
+        "rotated_label_pt": 11,
+        "formula_pt": 12,
+        "legend_pt": 9
+      },
+      "paper_3d_block": {
+        "front_fill": "#FFFFFF",
+        "side_fill": "#D9E6F7",
+        "top_fill": "#F3F7FF",
+        "hatch_density": "source_matched",
+        "shadow_offset_px": 4,
+        "outline_weight_px": 1
+      },
+      "legend": {
+        "frame_weight_px": 1,
+        "inner_arrow_scale": 0.55,
+        "formula_sample_scale": 0.70,
+        "text_baseline_policy": "source_matched"
+      }
+    }
+  }
+}
+```
+
+Rules for `style_calibration`:
+
+- Do not define groups that are irrelevant to the source. Do define every group represented by visible source content.
+- `forward_arrow` and `feedback_arrow` are separate. A dashed feedback arrow must not inherit the thick filled-arrow scale.
+- `legend` is a separate scale contract. Legend samples should not inherit main-diagram arrow or formula sizes unless the source visibly does.
+- Formula-like content with visible fraction bars should use `math_formula_group`; compact inline formulas should use `math_text`, `formula_text_block`, or run-based math fragments.
+- `scripts/style_calibration_gate.py --strict` enforces this contract only for strict dense replicas, so ordinary small diagrams can omit it.
+
 For exact replicas, also add `metadata.visual_grammar_inventory` before choosing components. This is a source-fact inventory for visual primitives, not a component decision.
 
 ```json
 {
   "metadata": {
     "visual_grammar_inventory": {
-      "shape_facts": ["thin rounded rectangle", "outlined triangle"],
-      "cell_facts": ["continuous rectangular cells", "5 columns", "low rounding"],
-      "line_facts": ["solid horizontal", "dashed orthogonal", "arrowhead at end", "thick ribbon arrow"],
+      "shape_facts": [
+        {
+          "role": "formula_box",
+          "form": "small rounded rectangle",
+          "relative_size": "compact",
+          "must_not_render_as": ["large empty callout", "plain multiline text"]
+        }
+      ],
+      "cell_facts": [
+        {
+          "role": "feature_cells",
+          "form": "continuous rectangular cells",
+          "count": 5,
+          "rounding": "low",
+          "must_not_render_as": ["rounded token_grid", "loose process boxes"]
+        }
+      ],
+      "line_facts": [
+        {
+          "role": "feedback_arrow",
+          "form": "curved dashed arrow",
+          "dash_rhythm": "short_dense",
+          "relative_width": "thin_to_medium",
+          "arrowhead": "small_black_triangle",
+          "must_not_render_as": ["long_sparse_dash_blocks", "oversized_black_ribbon"]
+        }
+      ],
       "symbol_facts": ["circle plus", "triangle gate"],
       "wave_facts": ["polyline-like", "single peak", "noisy high frequency"],
-      "text_facts": ["single-line math", "bold centered title"]
+      "text_facts": [
+        {
+          "role": "output_label",
+          "form": "single-line label",
+          "must_not_render_as": ["wrapped label", "opposite rotation direction"]
+        }
+      ]
     }
   }
 }

@@ -162,6 +162,17 @@ The checklist fields are the reviewer's source-derived acceptance criteria:
 - Findings should cite failed checklist ids through `checklist_refs` when possible.
 - A review may include passing checklist items. They help later rounds avoid regressing details that already match.
 
+For strict dense replicas, these crop types require local review before final when they exist in the source/scene: `arrow_dense`, `formula_dense`, `rotated_text`, `small_text`, `legend`, `paper_3d`, and `output_label`. Full-page-only review is not enough for these categories. Use `review_checklist_gate.py --final --strict-dense` with the review manifest so missing local `region_scores` coverage is caught as a review defect.
+
+Also treat these as blocking in strict replica mode:
+
+- rotated text has the wrong angle sign or reads in the opposite visual direction from the source
+- source single-line labels wrap into multiple lines
+- legend elements inherit main-diagram scale and become too heavy
+- feedback dashed arrows have visibly wrong dash rhythm or oversized arrowheads
+- formula boxes are more than about 20% larger/smaller than the same source role
+- a formula box, arrowhead, or rotated label is visibly placed in a whitespace relationship opposite to the source
+
 When the scene includes `metadata.arrow_plan`, the topology checklist should reference those arrow ids whenever possible. For example, report `A003 fails: source is a horizontal boundary-to-module arrow, replica lands on the module center and becomes diagonal`. Do not collapse several arrow defects into one broad note such as "arrows are wrong"; the rebuild brief needs per-arrow evidence.
 
 When the scene includes `metadata.region_plan[].local_acceptance_checklist`, use those region-local facts as the visible acceptance criteria. A global verdict is not enough; the reviewer should say which region fails and whether the failure is arrow direction, endpoint connection, line geometry, formula fidelity, text overlap, or unexpected grid/dash artifacts.
@@ -206,6 +217,17 @@ python scripts\review_findings_to_repair_plan.py `
 ```
 
 Do not continue to rebuild planning if `review_checklist_gate.py` fails. Fix the reviewer output first: missing local source image path, empty checklists, invalid statuses, or findings that do not cite failed checklist items are review defects, not scene defects.
+
+For final strict dense delivery, run the stricter review gate after the last visual review says the figure is acceptable:
+
+```powershell
+python scripts\review_checklist_gate.py `
+  review_round_final\figure_01_review_findings.json `
+  --manifest review_round_final\figure_01_review_manifest.json `
+  --require-failed-refs `
+  --final --strict-dense `
+  --output-report review_round_final\figure_01_review_checklist_gate.json
+```
 
 `scene_rebuild_brief.json` does not choose among patch modes. It always instructs the next authoring round to:
 

@@ -29,6 +29,7 @@ Focus on visible fidelity only:
 - text appearance
 - density, spacing, and alignment
 - container and boundary grammar
+- strict dense local details: arrow_dense, formula_dense, rotated_text, small_text, legend, paper_3d, and output_label areas when present
 
 Do not judge by semantic similarity alone. If the source uses a specific visual grammar and the replica uses a generic substitute, report it as a defect.
 
@@ -115,6 +116,7 @@ The checklist fields are mandatory for exact-replica reviews:
 - `visual_checklist`: source-derived layout/style/visual-grammar facts. Check overlap, line-through-text, label wrapping, cell count/gap/rounding, symbol internals, sampled wave shape, math text attachment, bracket/tensor spacing, feature-stack thickness, title placement, color, rounding, line weight, and shadow.
 - `fidelity_checklist`: source-object obligations that must not be simplified away. Check worker/person details, crossed tools, neural-network node-link motifs, dense device/icon internals, and thick/ribbon arrow body-head shape.
 - `region_scores`: per-region review status when region context is provided. For every region, answer whether arrow directions are correct, endpoints visibly connect to the right boundary/port, horizontal/vertical/curved lines match the source, formulas render as formulas rather than raw `_`/`^` text, text overlaps are absent, and there are no unexpected grids, dashed fragments, broken connector gaps, or stray arrow stubs. Use `pass`, `fail`, `uncertain`, `not_reviewed`, or `not_applicable`.
+- For strict dense replicas, full-page-only review is insufficient for `arrow_dense`, `formula_dense`, `rotated_text`, `small_text`, `legend`, `paper_3d`, or `output_label` regions. If those regions are supplied, inspect them locally and include `region_scores`.
 - `status`: use `pass`, `fail`, or `uncertain`.
 - `certainty`: use `certain`, `inferred`, or `uncertain`.
 - Use `uncertain` instead of inventing details when a source crop is unclear.
@@ -130,6 +132,15 @@ Use:
 - `important`: the replica is recognizably the same figure, but a visible subsystem is still wrong
 - `general`: minor but still real visual drift
 - `acceptable`: only if the difference is too small to matter visually
+
+Treat these as blocking in strict replica mode:
+
+- rotated text has the wrong angle sign or reads in the opposite visual direction from the source
+- source single-line labels wrap into multiple lines
+- legend elements inherit main-diagram scale and become too heavy
+- feedback dashed arrows have visibly wrong dash rhythm or oversized arrowheads
+- formula boxes are more than about 20% larger/smaller than the same source role
+- a formula box, arrowhead, or rotated label is visibly placed in a whitespace relationship opposite to the source
 
 ## Review Discipline
 
