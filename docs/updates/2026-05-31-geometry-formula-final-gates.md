@@ -21,6 +21,10 @@ The previous region-first update added the right workflow ideas, but three impor
   - `target_boundary`
   - `endpoint_must_touch` / `must_touch_boundary`
   - shared bus alignment through `shared_bus_id`, `shared_bus_axis`, and optional bus point index.
+- Added raw endpoint checks so forced routes such as `route: "horizontal"` cannot hide a misaligned `from_point` or `to_point`.
+- Fixed `tolerance_px` handling after pixel scenes are normalized to inches; the gate now uses the scene scale metadata instead of treating pixel tolerance as inches.
+- Added `source_node` / `target_node` support for free-point endpoints that still must touch a declared node boundary.
+- Added `shared_bus_point` selectors such as `raw_from` and `raw_to` for bus assertions that must inspect author-entered endpoints instead of post-routed points.
 - Tightened strict region categorization so global review text mentioning arrows does not accidentally satisfy `arrow_dense` or `small_text` local crop coverage.
 - Added `review_checklist_gate.py --final`, which fails final review if `region_scores` are missing, any region score is `not_reviewed`, or any region score remains `fail`.
 - Added `math_formula_group` to the component map, schema, style profiles, effective renderer fields, strict validation, and Visio renderer.
@@ -46,6 +50,7 @@ The previous region-first update added the right workflow ideas, but three impor
 
 - `scene_validate.py --strict` passes for `templates/examples/geometry_formula_contract.scene.json`.
 - `scene_geometry_assert.py --strict` passes for `templates/examples/geometry_formula_contract.scene.json`.
+- A deliberately bad raw endpoint fixture fails `scene_geometry_assert.py --strict`, proving route projection no longer hides endpoint drift.
 - Existing `templates/examples/rounded_orthogonal_connector.scene.json` still passes strict validation and geometry assertions.
 - `review_checklist_gate.py --final` passes a complete reviewed-region fixture and fails a fixture containing `not_reviewed`.
 - `scene_to_visio.py` exports VSDX/SVG/PNG for the formula contract example.

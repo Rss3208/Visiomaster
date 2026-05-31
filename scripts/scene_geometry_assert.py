@@ -7,7 +7,17 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from scene_to_visio import edge_route_points, edge_style, load_component_map, load_style_profiles, normalize_scene_coordinates
+from scene_to_visio import (
+    edge_point,
+    edge_route_points,
+    edge_style,
+    load_component_map,
+    load_style_profiles,
+    node_center_point,
+    node_id_from_endpoint,
+    normalize_scene_coordinates,
+    resolve_edge_endpoint,
+)
 from scene_validate import (
     base_node_id,
     bbox_signature,
@@ -32,6 +42,11 @@ def tolerance_for(plan: dict[str, Any], contract: dict[str, Any], page: dict[str
     if isinstance(contract.get("tolerance_in"), (int, float)):
         return max(0.0, float(contract["tolerance_in"]))
     if isinstance(contract.get("tolerance_px"), (int, float)):
+        metadata = contract.get("_scene_metadata") if isinstance(contract.get("_scene_metadata"), dict) else {}
+        scale_x = metadata.get("scale_x_in_per_px")
+        scale_y = metadata.get("scale_y_in_per_px")
+        if isinstance(scale_x, (int, float)) and isinstance(scale_y, (int, float)):
+            return max(0.0, float(contract["tolerance_px"]) * max(float(scale_x), float(scale_y)))
         units = str(page.get("units", "")).lower()
         if units in {"px", "pixel", "pixels"}:
             return max(0.0, float(contract["tolerance_px"]))
@@ -42,6 +57,14 @@ def tolerance_for(plan: dict[str, Any], contract: dict[str, Any], page: dict[str
     if isinstance(plan.get("source_bbox_px"), list) and bbox_signature(plan.get("source_bbox_px")):
         return 3.0 if str(page.get("units", "")).lower() in {"px", "pixel", "pixels"} else 0.035
     return 0.035
+
+
+def contract_with_metadata(contract: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
+    if "scale_x_in_per_px" not in metadata and "scale_y_in_per_px" not in metadata:
+        return contract
+    merged = dict(contract)
+    merged["_scene_metadata"] = metadata
+    return merged
 
 
 def point_to_boundary_distance(point: tuple[float, float], box: tuple[float, float, float, float], side: str | None) -> float:
@@ -90,11 +113,60 @@ def endpoint_node(edge: dict[str, Any], endpoint: str, nodes_by_id: dict[str, di
     return nodes_by_id.get(base_node_id(value))
 
 
+def contract_node(
+    edge: dict[str, Any],
+    endpoint: str,
+    contract: dict[str, Any],
+    nodes_by_id: dict[str, dict[str, Any]],
+) -> dict[str, Any] | None:
+    node = endpoint_node(edge, endpoint, nodes_by_id)
+    if node is not None:
+        return node
+    key_options = (
+        ("target_node", "target_node_id", "to_node", "to_node_id", "endpoint_must_touch_node")
+        if endpoint == "to"
+        else ("source_node", "source_node_id", "from_node", "from_node_id", "endpoint_must_touch_source_node")
+    )
+    for key in key_options:
+        value = contract.get(key)
+        if isinstance(value, str) and value.strip() in nodes_by_id:
+            return nodes_by_id[value.strip()]
+    return None
+
+
+def raw_edge_endpoints(edge: dict[str, Any], nodes_by_id: dict[str, dict[str, Any]]) -> tuple[tuple[float, float], tuple[float, float]]:
+    from_ref = edge.get("from")
+    to_ref = edge.get("to")
+    from_point = edge_point(edge, "from")
+    to_point = edge_point(edge, "to")
+    from_node = nodes_by_id[node_id_from_endpoint(from_ref)] if isinstance(from_ref, str) else None
+    to_node = nodes_by_id[node_id_from_endpoint(to_ref)] if isinstance(to_ref, str) else None
+    from_peer_point = to_point or (node_center_point(to_node) if to_node else from_point)
+    to_peer_point = from_point or (node_center_point(from_node) if from_node else to_point)
+    if from_peer_point is None or to_peer_point is None:
+        raise ValueError(f"Edge `{edge.get('id', '<unknown>')}` requires resolvable raw endpoints.")
+    return (
+        resolve_edge_endpoint(edge, "from", from_peer_point, nodes_by_id),
+        resolve_edge_endpoint(edge, "to", to_peer_point, nodes_by_id),
+    )
+
+
+def raw_endpoint_checks_enabled(contract: dict[str, Any]) -> bool:
+    return str(contract.get("raw_endpoint_check", contract.get("raw_endpoint_checks", "true"))).lower() not in {
+        "false",
+        "0",
+        "no",
+        "off",
+    }
+
+
 def check_plan_edge(
     *,
     plan: dict[str, Any],
     edge: dict[str, Any],
     route_points: list[tuple[float, float]],
+    raw_start: tuple[float, float],
+    raw_end: tuple[float, float],
     nodes_by_id: dict[str, dict[str, Any]],
     page: dict[str, Any],
 ) -> list[str]:
@@ -112,6 +184,17 @@ def check_plan_edge(
         failures.append(f"{plan_id}/{edge_id}: start_y_equals_end_y failed ({start[1]:.3f} vs {end[1]:.3f}, tol {tol:.3f}).")
     if contract.get("start_x_equals_end_x") and abs(start[0] - end[0]) > tol:
         failures.append(f"{plan_id}/{edge_id}: start_x_equals_end_x failed ({start[0]:.3f} vs {end[0]:.3f}, tol {tol:.3f}).")
+    if raw_endpoint_checks_enabled(contract):
+        if contract.get("start_y_equals_end_y") and abs(raw_start[1] - raw_end[1]) > tol:
+            failures.append(
+                f"{plan_id}/{edge_id}: raw start_y_equals_end_y failed "
+                f"({raw_start[1]:.3f} vs {raw_end[1]:.3f}, tol {tol:.3f}); route projection may be hiding endpoint drift."
+            )
+        if contract.get("start_x_equals_end_x") and abs(raw_start[0] - raw_end[0]) > tol:
+            failures.append(
+                f"{plan_id}/{edge_id}: raw start_x_equals_end_x failed "
+                f"({raw_start[0]:.3f} vs {raw_end[0]:.3f}, tol {tol:.3f}); route projection may be hiding endpoint drift."
+            )
     if contract.get("must_be_horizontal") and any(abs(a[1] - b[1]) > tol for a, b in zip(route_points, route_points[1:])):
         failures.append(f"{plan_id}/{edge_id}: must_be_horizontal failed; at least one segment is not horizontal.")
     if contract.get("must_be_vertical") and any(abs(a[0] - b[0]) > tol for a, b in zip(route_points, route_points[1:])):
@@ -129,20 +212,73 @@ def check_plan_edge(
             failures.append(f"{plan_id}/{edge_id}: source_boundary expected {source_boundary}, edge endpoint uses {source_side}.")
 
     if contract.get("endpoint_must_touch") or contract.get("must_touch_boundary"):
-        target = endpoint_node(edge, "to", nodes_by_id)
-        if target and target_boundary:
-            distance = point_to_boundary_distance(end, node_box(target), target_boundary)
-            if distance > tol:
-                failures.append(f"{plan_id}/{edge_id}: endpoint does not touch target {target_boundary} boundary (gap {distance:.3f}, tol {tol:.3f}).")
-        source = endpoint_node(edge, "from", nodes_by_id)
-        if source and source_boundary:
-            distance = point_to_boundary_distance(start, node_box(source), source_boundary)
-            if distance > tol:
-                failures.append(f"{plan_id}/{edge_id}: startpoint does not touch source {source_boundary} boundary (gap {distance:.3f}, tol {tol:.3f}).")
+        target = contract_node(edge, "to", contract, nodes_by_id)
+        if target_boundary:
+            if target is None:
+                failures.append(
+                    f"{plan_id}/{edge_id}: target_boundary `{target_boundary}` with endpoint_must_touch requires "
+                    "`to` to reference a node or geometry_contract.target_node/target_node_id."
+                )
+            else:
+                distance = point_to_boundary_distance(end, node_box(target), target_boundary)
+                if distance > tol:
+                    failures.append(f"{plan_id}/{edge_id}: endpoint does not touch target {target_boundary} boundary (gap {distance:.3f}, tol {tol:.3f}).")
+                if raw_endpoint_checks_enabled(contract):
+                    raw_distance = point_to_boundary_distance(raw_end, node_box(target), target_boundary)
+                    if raw_distance > tol:
+                        failures.append(
+                            f"{plan_id}/{edge_id}: raw endpoint does not touch target {target_boundary} boundary "
+                            f"(gap {raw_distance:.3f}, tol {tol:.3f}); route projection may be hiding endpoint drift."
+                        )
+        source = contract_node(edge, "from", contract, nodes_by_id)
+        if source_boundary:
+            if source is None:
+                failures.append(
+                    f"{plan_id}/{edge_id}: source_boundary `{source_boundary}` with endpoint_must_touch requires "
+                    "`from` to reference a node or geometry_contract.source_node/source_node_id."
+                )
+            else:
+                distance = point_to_boundary_distance(start, node_box(source), source_boundary)
+                if distance > tol:
+                    failures.append(f"{plan_id}/{edge_id}: startpoint does not touch source {source_boundary} boundary (gap {distance:.3f}, tol {tol:.3f}).")
+                if raw_endpoint_checks_enabled(contract):
+                    raw_distance = point_to_boundary_distance(raw_start, node_box(source), source_boundary)
+                    if raw_distance > tol:
+                        failures.append(
+                            f"{plan_id}/{edge_id}: raw startpoint does not touch source {source_boundary} boundary "
+                            f"(gap {raw_distance:.3f}, tol {tol:.3f}); route projection may be hiding endpoint drift."
+                        )
     return failures
 
 
-def check_shared_bus(groups: dict[str, list[tuple[str, list[tuple[float, float]], dict[str, Any], dict[str, Any]]]], page: dict[str, Any]) -> list[str]:
+def bus_point_for_contract(
+    route_points: list[tuple[float, float]],
+    raw_start: tuple[float, float],
+    raw_end: tuple[float, float],
+    contract: dict[str, Any],
+) -> tuple[float, float]:
+    selector = str(contract.get("shared_bus_point", contract.get("bus_point", ""))).strip().lower()
+    if selector in {"raw_from", "from_raw", "source_raw"}:
+        return raw_start
+    if selector in {"raw_to", "to_raw", "target_raw"}:
+        return raw_end
+    if selector in {"route_start", "start", "from"}:
+        return route_points[0]
+    if selector in {"route_end", "end", "to", ""}:
+        if not selector:
+            index = int(contract.get("shared_bus_point_index", contract.get("bus_point_index", -1)))
+            return route_points[index] if route_points and -len(route_points) <= index < len(route_points) else route_points[-1]
+        return route_points[-1]
+    if selector.startswith("route_index:"):
+        try:
+            index = int(selector.split(":", 1)[1])
+        except ValueError:
+            return route_points[-1]
+        return route_points[index] if route_points and -len(route_points) <= index < len(route_points) else route_points[-1]
+    return route_points[-1]
+
+
+def check_shared_bus(groups: dict[str, list[tuple[str, list[tuple[float, float]], tuple[float, float], tuple[float, float], dict[str, Any], dict[str, Any]]]], page: dict[str, Any]) -> list[str]:
     failures: list[str] = []
     for bus_id, items in groups.items():
         if len(items) < 2:
@@ -151,7 +287,7 @@ def check_shared_bus(groups: dict[str, list[tuple[str, list[tuple[float, float]]
         values: list[float] = []
         labels: list[str] = []
         tolerance = 0.0
-        for plan_id, route_points, plan, contract in items:
+        for plan_id, route_points, raw_start, raw_end, plan, contract in items:
             tol = tolerance_for(plan, contract, page)
             tolerance = max(tolerance, tol)
             bus_axis = str(contract.get("shared_bus_axis", contract.get("bus_axis", ""))).lower()
@@ -161,8 +297,7 @@ def check_shared_bus(groups: dict[str, list[tuple[str, list[tuple[float, float]]
             if bus_axis != axis:
                 failures.append(f"{plan_id}: shared bus `{bus_id}` mixes bus axes `{axis}` and `{bus_axis}`.")
                 continue
-            index = int(contract.get("shared_bus_point_index", contract.get("bus_point_index", -1)))
-            point = route_points[index] if route_points and -len(route_points) <= index < len(route_points) else route_points[-1]
+            point = bus_point_for_contract(route_points, raw_start, raw_end, contract)
             values.append(point[0] if axis == "x" else point[1])
             labels.append(plan_id)
         if values and max(values) - min(values) > tolerance:
@@ -185,7 +320,7 @@ def run_assertions(scene: dict[str, Any], strict: bool = False) -> tuple[list[st
     plans = scene.get("metadata", {}).get("arrow_plan", []) if isinstance(scene.get("metadata"), dict) else []
     failures: list[str] = []
     warnings: list[str] = []
-    bus_groups: dict[str, list[tuple[str, list[tuple[float, float]], dict[str, Any], dict[str, Any]]]] = defaultdict(list)
+    bus_groups: dict[str, list[tuple[str, list[tuple[float, float]], tuple[float, float], tuple[float, float], dict[str, Any], dict[str, Any]]]] = defaultdict(list)
     if not isinstance(plans, list):
         return ["metadata.arrow_plan must be an array for geometry assertions."], warnings
     for plan in plans:
@@ -194,6 +329,9 @@ def run_assertions(scene: dict[str, Any], strict: bool = False) -> tuple[list[st
         contract = plan.get("geometry_contract")
         if not isinstance(contract, dict):
             continue
+        contract = contract_with_metadata(contract, scene.get("metadata", {}) if isinstance(scene.get("metadata"), dict) else {})
+        plan = dict(plan)
+        plan["geometry_contract"] = contract
         plan_id = str(plan.get("id", "")).strip()
         edges = by_plan.get(plan_id, [])
         if not edges:
@@ -204,13 +342,24 @@ def run_assertions(scene: dict[str, Any], strict: bool = False) -> tuple[list[st
             try:
                 style = edge_style(edge, component_map, profile)
                 route_points = edge_route_points(edge, style, nodes_by_id)
+                raw_start, raw_end = raw_edge_endpoints(edge, nodes_by_id)
             except Exception as exc:
-                failures.append(f"{plan_id}/{edge.get('id', '<edge>')}: route could not be resolved: {exc}")
+                failures.append(f"{plan_id}/{edge.get('id', '<edge>')}: route/raw endpoints could not be resolved: {exc}")
                 continue
-            failures.extend(check_plan_edge(plan=plan, edge=edge, route_points=route_points, nodes_by_id=nodes_by_id, page=page))
+            failures.extend(
+                check_plan_edge(
+                    plan=plan,
+                    edge=edge,
+                    route_points=route_points,
+                    raw_start=raw_start,
+                    raw_end=raw_end,
+                    nodes_by_id=nodes_by_id,
+                    page=page,
+                )
+            )
             bus_id = str(contract.get("shared_bus_id", contract.get("bus_id", ""))).strip()
             if bus_id:
-                bus_groups[bus_id].append((plan_id, route_points, plan, contract))
+                bus_groups[bus_id].append((plan_id, route_points, raw_start, raw_end, plan, contract))
     failures.extend(check_shared_bus(bus_groups, page))
     return failures, warnings
 

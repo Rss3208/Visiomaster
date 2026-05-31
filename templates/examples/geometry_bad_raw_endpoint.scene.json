@@ -1,0 +1,405 @@
+{
+  "version": "0.1",
+  "metadata": {
+    "title": "Bad raw endpoint geometry contract example",
+    "style_profile": "paper_white",
+    "fidelity": "exact",
+    "replica_review_mode": "strict_replica",
+    "replica_stage": "layout_topology",
+    "source_aspect_ratio": 1.6,
+    "source_visual_inventory": {
+      "analysis_basis": "visual_llm_source_image",
+      "language_profile": "English math flow",
+      "do_not_translate": true,
+      "unknown_text_policy": "mark_unreadable_do_not_invent",
+      "scene_authoring_mode": "fresh_from_source_inventory",
+      "regions": [
+        {
+          "id": "global",
+          "crop_type": "global",
+          "source_bbox_px": [
+            0,
+            0,
+            800,
+            500
+          ],
+          "required_labels": [
+            "A",
+            "B",
+            "ω"
+          ],
+          "required_edge_motifs": [
+            "horizontal boundary-to-boundary arrow"
+          ],
+          "text_layout_facts": [
+            "module labels are centered and balanced in the full canvas"
+          ],
+          "box_style_facts": [
+            "white page background",
+            "thin module outlines"
+          ],
+          "line_style_facts": [
+            "solid horizontal arrow with one final arrowhead"
+          ]
+        },
+        {
+          "id": "arrow_formula",
+          "crop_type": "arrow-dense small-text",
+          "source_bbox_px": [
+            90,
+            150,
+            710,
+            360
+          ],
+          "required_labels": [
+            "A",
+            "B",
+            "ω"
+          ],
+          "required_edge_motifs": [
+            "A right boundary to B left boundary, same y"
+          ],
+          "text_layout_facts": [
+            "formula baseline and fraction bar remain aligned"
+          ],
+          "box_style_facts": [
+            "formula has no visible bounding box"
+          ],
+          "line_style_facts": [
+            "arrow is horizontal and does not cross formula"
+          ]
+        },
+        {
+          "id": "input",
+          "crop_type": "input",
+          "source_bbox_px": [
+            90,
+            150,
+            260,
+            280
+          ],
+          "required_labels": [
+            "A"
+          ],
+          "required_edge_motifs": [
+            "arrow starts from A right boundary"
+          ],
+          "text_layout_facts": [
+            "A label centered"
+          ],
+          "box_style_facts": [
+            "thin rectangular module outline"
+          ],
+          "line_style_facts": [
+            "outgoing arrow starts at right boundary"
+          ]
+        },
+        {
+          "id": "core",
+          "crop_type": "core",
+          "source_bbox_px": [
+            260,
+            180,
+            540,
+            370
+          ],
+          "required_labels": [
+            "ω"
+          ],
+          "required_formulas": [
+            "ω = exp(s_i) / Σ_j exp(s_j)"
+          ],
+          "required_component_motifs": [
+            "stacked omega fraction formula"
+          ],
+          "text_layout_facts": [
+            "fraction numerator and denominator centered on the bar"
+          ],
+          "box_style_facts": [
+            "formula has no visible bounding box"
+          ],
+          "line_style_facts": [
+            "fraction bar is a short horizontal line"
+          ]
+        },
+        {
+          "id": "output",
+          "crop_type": "output",
+          "source_bbox_px": [
+            540,
+            150,
+            710,
+            280
+          ],
+          "required_labels": [
+            "B"
+          ],
+          "required_edge_motifs": [
+            "arrow lands on B left boundary"
+          ],
+          "text_layout_facts": [
+            "B label centered"
+          ],
+          "box_style_facts": [
+            "thin rectangular module outline"
+          ],
+          "line_style_facts": [
+            "incoming arrow lands on left boundary"
+          ]
+        }
+      ]
+    },
+    "visual_grammar_inventory": {
+      "shape_facts": [
+        "two rectangular modules"
+      ],
+      "cell_facts": [],
+      "line_facts": [
+        "one horizontal solid arrow"
+      ],
+      "symbol_facts": [],
+      "wave_facts": [],
+      "text_facts": [
+        "single-line labels",
+        "stacked math fraction"
+      ]
+    },
+    "region_plan": [
+      {
+        "id": "global",
+        "crop_type": "global",
+        "source_bbox_px": [
+          0,
+          0,
+          800,
+          500
+        ],
+        "target_bbox": [
+          0,
+          0,
+          800,
+          500
+        ],
+        "review_focus": "global module spacing and arrow lane",
+        "local_acceptance_checklist": [
+          "A and B modules are horizontally aligned",
+          "center annotation sits below the arrow lane"
+        ]
+      },
+      {
+        "id": "arrow_formula",
+        "crop_type": "arrow-dense small-text",
+        "source_bbox_px": [
+          90,
+          150,
+          710,
+          360
+        ],
+        "target_bbox": [
+          90,
+          150,
+          710,
+          360
+        ],
+        "review_focus": "horizontal endpoint contract and omega fraction formula",
+        "local_acceptance_checklist": [
+          "arrow starts at A right boundary and ends at B left boundary",
+          "arrow start and end y coordinates match",
+          "omega formula uses one aligned fraction group, not loose text boxes"
+        ]
+      },
+      {
+        "id": "input",
+        "crop_type": "input",
+        "source_bbox_px": [
+          90,
+          150,
+          260,
+          280
+        ],
+        "target_bbox": [
+          90,
+          150,
+          260,
+          280
+        ],
+        "review_focus": "input module and arrow origin",
+        "local_acceptance_checklist": [
+          "A label is centered inside the input module",
+          "arrow begins on the input module right boundary"
+        ]
+      },
+      {
+        "id": "core",
+        "crop_type": "core",
+        "source_bbox_px": [
+          260,
+          180,
+          540,
+          370
+        ],
+        "target_bbox": [
+          260,
+          180,
+          540,
+          370
+        ],
+        "review_focus": "omega formula group and center spacing",
+        "local_acceptance_checklist": [
+          "omega formula is a structured fraction group",
+          "numerator and denominator are centered over the fraction bar"
+        ]
+      },
+      {
+        "id": "output",
+        "crop_type": "output",
+        "source_bbox_px": [
+          540,
+          150,
+          710,
+          280
+        ],
+        "target_bbox": [
+          540,
+          150,
+          710,
+          280
+        ],
+        "review_focus": "output module and arrow target boundary",
+        "local_acceptance_checklist": [
+          "B label is centered inside the output module",
+          "arrow lands on the output module left boundary"
+        ]
+      }
+    ],
+    "arrow_plan": [
+      {
+        "id": "A001",
+        "from": "box_a:right@0.50",
+        "to": "box_b:left@0.50",
+        "from_visual_object": "A module",
+        "from_anchor_description": "right boundary midpoint",
+        "to_visual_object": "B module",
+        "to_anchor_description": "left boundary midpoint",
+        "route_shape": "straight_horizontal",
+        "line_style": "solid",
+        "arrowhead": "end_triangle",
+        "semantic_intent": "data_flow",
+        "source_bbox_px": [
+          240,
+          210,
+          560,
+          230
+        ],
+        "must_not_cross": [
+          "omega_formula"
+        ],
+        "relative_position_facts": [
+          "start and end are same y",
+          "target touches B left boundary"
+        ],
+        "geometry_contract": {
+          "must_be_horizontal": true,
+          "start_y_equals_end_y": true,
+          "target_boundary": "left",
+          "source_boundary": "right",
+          "endpoint_must_touch": true,
+          "tolerance_px": 3,
+          "target_node": "box_b"
+        },
+        "direction": "left_to_right",
+        "certainty": "certain"
+      }
+    ]
+  },
+  "page": {
+    "width": 800,
+    "height": 500,
+    "units": "px",
+    "origin": "top-left",
+    "target_width_in": 8,
+    "background": "#FFFFFF"
+  },
+  "assets": [],
+  "nodes": [
+    {
+      "id": "page_background",
+      "type": "page_background",
+      "x": 0,
+      "y": 0,
+      "w": 800,
+      "h": 500,
+      "z": -100
+    },
+    {
+      "id": "box_a",
+      "type": "process_box",
+      "x": 110,
+      "y": 180,
+      "w": 130,
+      "h": 80,
+      "text": "A",
+      "style": {
+        "fill": "#F8FAFC",
+        "line": "#475569",
+        "shadow": null
+      }
+    },
+    {
+      "id": "box_b",
+      "type": "process_box",
+      "x": 560,
+      "y": 180,
+      "w": 130,
+      "h": 80,
+      "text": "B",
+      "style": {
+        "fill": "#F8FAFC",
+        "line": "#475569",
+        "shadow": null
+      }
+    },
+    {
+      "id": "omega_formula",
+      "type": "math_formula_group",
+      "x": 285,
+      "y": 285,
+      "w": 230,
+      "h": 70,
+      "left_text": "ω",
+      "operator": "=",
+      "numerator": "exp(s_i)",
+      "denominator": "Σ_j exp(s_j)",
+      "baseline_y_ratio": 0.5,
+      "source_bbox_px": [
+        285,
+        285,
+        515,
+        355
+      ],
+      "must_match_facts": [
+        "omega formula uses stacked fraction",
+        "equals sign aligns with fraction bar"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "a_to_b",
+      "type": "arrow_connector",
+      "arrow_plan_id": "A001",
+      "from": "box_a:right@0.50",
+      "route": "horizontal",
+      "style": {
+        "line": "#334155",
+        "line_weight_pt": 1.2,
+        "end_arrow": "triangle",
+        "arrow_size": "small"
+      },
+      "to_point": [
+        560,
+        260
+      ]
+    }
+  ]
+}
