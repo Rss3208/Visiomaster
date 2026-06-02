@@ -299,9 +299,12 @@ For exact replicas, add an arrow inventory before authoring edges. This is a sou
         "to_anchor": "left@0.50",
         "direction": "left_to_right",
         "route_shape": "straight_horizontal",
+        "arrow_template": "straight_flow",
         "line_style": "solid",
         "arrowhead": "end",
+        "arrowhead_policy": "end_only",
         "semantic_intent": "data_flow",
+        "region_regression_group": "encoder_decoder_main_lane",
         "source_bbox_px": [100, 120, 420, 145],
         "must_not_cross": ["decoder label", "top caption"],
         "relative_position_facts": ["source and target are horizontally aligned"],
@@ -333,6 +336,21 @@ Supported `semantic_intent` values are:
 
 Supported `route_shape` values are `straight`, `straight_horizontal`, `straight_vertical`, `horizontal`, `vertical`, `diagonal`, `short_diagonal`, `orthogonal`, `elbow`, `right_angle`, `rounded_orthogonal`, `hv`, `vh`, `curved`, `smooth_curve`, `loop`, and `freeform`.
 
+Supported strict `arrow_template` values are:
+
+- `straight_flow`: one solid or dashed straight flow arrow, normally horizontal, with one terminal arrowhead.
+- `vertical_flow`: one vertical flow arrow with one terminal arrowhead.
+- `orthogonal_flow`: axis-aligned routed flow with one terminal arrowhead.
+- `rounded_orthogonal_flow`: axis-aligned routed flow with rounded 90-degree bends and one terminal arrowhead.
+- `bezier_arc`: deterministic source-like arc with Bezier/control points and one terminal arrowhead.
+- `skip_arc_no_arrow`: curved or arced skip connector with no arrowhead.
+- `orthogonal_bus_no_arrow`: shared trunk, skip line, or bus segment with no arrowhead.
+- `feedback_path`: dashed feedback/backprop route with the source-visible arrowhead policy.
+- `feedback_loop`: loop/cycle/update route; use `loop_arrow` or an explicitly justified Bezier/loop path.
+- `boundary_flow`: boundary/frame handoff arrow, normally through `boundary_port` / `boundary_arrow`.
+
+Supported `arrowhead_policy` values are `end_only`, `none`, `start_only`, and `both`. Do not rely on edge-type defaults in strict replica mode: write the source policy in `arrow_plan`, then make the edge style match it.
+
 Rules for `arrow_plan`:
 
 - Every source-visible arrow in strict replica work should have an `arrow_plan` entry before the first `scene.json` is authored.
@@ -340,6 +358,7 @@ Rules for `arrow_plan`:
 - Every source-visible scene edge should reference one entry with `arrow_plan_id`.
 - One `arrow_plan_id` may bind to only one scene edge by default. If a single source arrow must be represented as multiple scene segments, each segment edge must set `same_source_arrow: true`, `segment_index`, and `segment_count`.
 - In strict mode, each active plan should record `from_visual_object`, `from_anchor_description`, `to_visual_object`, `to_anchor_description`, `route_shape`, `line_style`, `arrowhead`, `semantic_intent`, `source_bbox_px`, `must_not_cross`, and `relative_position_facts`.
+- In strict mode, prefer adding `arrow_template`, `arrowhead_policy`, `region_regression_group`, `expected_shape`, `source_bbox_px`, `confidence` or `certainty`, and `notes`. `scripts/arrow_audit_gate.py --write-audit` expands these fields into an `arrow_audit.json`/`.csv` table for visual review; the derived table must not replace `metadata.arrow_plan`.
 - Use `certainty: "uncertain"` only when the source crop is genuinely unreadable; do not invent a connector.
 - `feedback` and `loss_backprop` should map to `dashed_feedback_path`.
 - `boundary_handoff` and `frame_output` should use `boundary_port` / `boundary_arrow`.
@@ -347,7 +366,12 @@ Rules for `arrow_plan`:
 - `fork` / `fan_out` should originate from a `junction_point`, `merge_bus`, or `multi_port_junction`.
 - `loop_update` should use one continuous `loop_arrow`, not several line fragments plus a detached arrowhead.
 - `rounded_orthogonal` should use `rounded_orthogonal_connector` or `route: "rounded_orthogonal"` with an explicit corner radius. Do not map it to `smooth_curve`.
+- `bezier_arc` and `skip_arc_no_arrow` should use deterministic Bezier/arc control points. `curve_mode: "smooth"` / Catmull-Rom is allowed only for source-visible waves, decorative/hand-drawn curves, or explicit freeform curves, and should be declared with `allow_smooth_curve: true` or equivalent source facts.
+- If a strict Bezier/skip arc has no hand-measured control points yet, set `curve_mode: "bezier"` plus `arc_template` / `bezier_template` on the edge. Supported templates include `upper_arc`, `lower_arc`, `left_bulge`, `right_bulge`, and `small_bend_in`; optional `arc_lift_in` controls the arc height. The renderer expands these into a stable editable Bezier path instead of a global smooth spline.
+- Arrowed strict flow should use semantic side-ratio endpoints such as `node:right@0.50`. Raw `from_point` / `to_point` is acceptable only for visibly free-floating source lines and should be declared with `allow_free_endpoint` or `freeform_endpoint`.
+- Arrowless visual lines should be explicit. Use `arrowhead_policy: "none"` with `line_segment`, `join_connector`, or an edge style whose `begin_arrow` and `end_arrow` are both `none`.
 - `scene_validate.py --strict` treats missing or violated arrow-plan bindings as errors.
+- `scripts/arrow_audit_gate.py --strict` treats mismatched arrowhead policy, wrong template axes, unjustified smooth arcs, dangling tiny arrow fragments, and prohibited route crossings as rebuild defects for strict/exact scenes.
 - Use `geometry_contract` when a source arrow has measurable visual geometry that must survive rendering. Supported contract fields include booleans such as `must_be_horizontal`, `must_be_vertical`, `start_y_equals_end_y`, `start_x_equals_end_x`, `endpoint_must_touch`, `must_touch_boundary`, `must_not_cross_text`, and optional `raw_endpoint_check`; string fields such as `source_boundary`, `target_boundary`, `source_node`, `target_node`, `start_anchor`, `end_anchor`, `shared_bus_id`, `shared_bus_axis`, and `shared_bus_point` (`raw_from`, `raw_to`, `route_start`, `route_end`, or `route_index:N`); and numeric tolerances such as `tolerance_px` or `tolerance_in`. This is an optional stricter contract for important arrows, not a replacement for `route_shape`. Run `scripts/scene_geometry_assert.py --strict` to enforce these contracts after the scene is authored. The geometry gate checks both resolved raw endpoints and routed path points, so `route: "horizontal"` cannot hide a misaligned `to_point`.
 
 For local attention-like diagrams, record `metadata.local_motifs` or region-level motif facts before writing edges. Motif names can include `attention_score_motif`, `value_weighting_motif`, `residual_add_norm_motif`, and `concat_merge_motif`. Motif rules are source-level constraints, not decorative labels; for example Softmax in an attention-score motif is a floating label and should not become an edge endpoint.

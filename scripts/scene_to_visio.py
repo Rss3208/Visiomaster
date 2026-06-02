@@ -6473,6 +6473,43 @@ def expand_axis_aligned_points(
     return expanded
 
 
+def standardized_bezier_arc_points(
+    start: tuple[float, float],
+    end: tuple[float, float],
+    template: str,
+    edge: dict[str, Any],
+    style: dict[str, Any],
+) -> list[tuple[float, float]]:
+    sx, sy = start
+    ex, ey = end
+    dx = ex - sx
+    dy = ey - sy
+    distance = max(math.hypot(dx, dy), 1e-6)
+    lift = float(edge.get("arc_lift_in", style.get("arc_lift_in", max(0.16, min(1.1, distance * 0.28)))) or 0.16)
+    template = template.lower().replace("-", "_")
+
+    if template in {"upper", "up", "top", "above", "over", "upper_arc", "top_arc", "over_arc"}:
+        cy = min(sy, ey) - lift
+        return [start, (sx + dx * 0.25, cy), (sx + dx * 0.75, cy), end]
+    if template in {"lower", "down", "bottom", "below", "under", "lower_arc", "bottom_arc", "under_arc"}:
+        cy = max(sy, ey) + lift
+        return [start, (sx + dx * 0.25, cy), (sx + dx * 0.75, cy), end]
+    if template in {"left", "left_bulge", "left_arc", "outside_left"}:
+        cx = min(sx, ex) - lift
+        return [start, (cx, sy + dy * 0.20), (cx, sy + dy * 0.80), end]
+    if template in {"right", "right_bulge", "right_arc", "outside_right", "right_then_in"}:
+        cx = max(sx, ex) + lift
+        return [start, (cx, sy + dy * 0.20), (cx, sy + dy * 0.80), end]
+    if template in {"small_bend_in", "soft_bend_in"}:
+        return [start, (sx + dx * 0.55, sy), (ex - dx * 0.15, ey), end]
+
+    if abs(dx) >= abs(dy):
+        cy = min(sy, ey) - lift
+        return [start, (sx + dx * 0.25, cy), (sx + dx * 0.75, cy), end]
+    cx = max(sx, ex) + lift
+    return [start, (cx, sy + dy * 0.20), (cx, sy + dy * 0.80), end]
+
+
 def edge_route_points(
     edge: dict[str, Any],
     style: dict[str, Any],
@@ -6507,6 +6544,11 @@ def edge_route_points(
     start_tangent_point = edge_named_point(edge, "start_tangent_point")
     end_tangent_point = edge_named_point(edge, "end_tangent_point")
     axis_snap = float(edge.get("axis_snap_in", style.get("axis_snap_in", 0.03)))
+    curve_mode = str(edge.get("curve_mode", edge.get("curve", style.get("curve_mode", "")))).lower()
+    arrow_template = str(edge.get("arrow_template", edge.get("template", ""))).lower()
+    arc_template = str(
+        edge.get("arc_template", edge.get("bezier_template", edge.get("curve_template", "")))
+    ).lower()
     if explicit_points or start_tangent_point or end_tangent_point:
         routed: list[tuple[float, float]] = []
         append_distinct_point(routed, start)
@@ -6526,6 +6568,13 @@ def edge_route_points(
                 force_axis = "horizontal"
             routed = expand_axis_aligned_points(routed, force_axis)
         return snap_axis_segments(routed, axis_snap)
+
+    if curve_mode == "bezier" and (
+        arc_template
+        or arrow_template in {"bezier_arc", "skip_arc_no_arrow", "feedback_loop"}
+        or edge.get("standardize_bezier_arc")
+    ):
+        return standardized_bezier_arc_points(start, end, arc_template or arrow_template or "auto", edge, style)
 
     route = edge.get("route") or style.get("route") or "auto"
     if route == "straight":
@@ -6845,6 +6894,7 @@ def run_rebuild_gate(scene_path: Path) -> None:
         audit_path = Path(temp_dir) / "scene.audit.md"
         commands = [
             [sys.executable, str(scripts_dir / "scene_validate.py"), str(scene_path), "--strict"],
+            [sys.executable, str(scripts_dir / "arrow_audit_gate.py"), str(scene_path), "--strict"],
             [sys.executable, str(scripts_dir / "style_calibration_gate.py"), str(scene_path), "--strict"],
             [sys.executable, str(scripts_dir / "scene_geometry_assert.py"), str(scene_path), "--strict"],
             [

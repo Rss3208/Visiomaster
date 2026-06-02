@@ -76,6 +76,29 @@ It uses a controlled semantic vocabulary so the analysis side stays stable while
 | `residual_connector` | skip/residual loop relation | routed arrow, normally with explicit points |
 | `residual_loop` | alias-style residual/skip loop relation | routed arrow, normally with explicit points |
 
+## Strict Arrow Templates
+
+For strict replicas, choose the source arrow template before choosing the edge type. The template is recorded in `metadata.arrow_plan[].arrow_template` and checked by `scripts/arrow_audit_gate.py --strict`.
+
+| Template | Source grammar | Preferred scene expression |
+| --- | --- | --- |
+| `straight_flow` | straight horizontal flow with one arrowhead | `arrow_connector` / `lane_arrow` with side-ratio endpoints |
+| `vertical_flow` | straight vertical flow with one arrowhead | `lane_arrow` / `arrow_connector` with top/bottom side-ratio endpoints |
+| `orthogonal_flow` | right-angle routed flow with one arrowhead | `arrow_connector` or `boundary_arrow` with explicit `hv`/`vh`/`orthogonal` route |
+| `rounded_orthogonal_flow` | orthogonal route with rounded corners | `rounded_orthogonal_connector` with explicit corner radius |
+| `bezier_arc` | paper/architecture arc with one arrowhead | `curved_arrow` with `curve_mode: "bezier"` and explicit control points |
+| `skip_arc_no_arrow` | curved skip relation without arrowhead | `curved_arrow` with `end_arrow: "none"` and deterministic arc/control points |
+| `orthogonal_bus_no_arrow` | shared trunk/bus/skip line without arrowhead | `line_segment`, `join_connector`, or arrowless orthogonal route |
+| `feedback_path` | dashed return/backprop path | `dashed_feedback_path` or arrowless bus legs plus one final feedback arrow |
+| `feedback_loop` | visible cycle/update loop | one `loop_arrow` or source-justified Bezier loop, not fragments |
+| `boundary_flow` | flow entering/leaving a frame boundary | `boundary_port` plus `boundary_arrow` or source-like side-ratio route |
+
+Do not use a generic smooth curve for ordinary paper arcs. `curve_mode: "smooth"` / Catmull-Rom is for waveform, decorative, hand-drawn, organic, or explicitly freeform source curves. A normal skip arc should be a Bezier/arc template so the arrowhead tangent and endpoint relation stay stable.
+
+When the source arc is a standard paper/architecture arc and exact control points are not yet measured, set `curve_mode: "bezier"` and an edge-level `arc_template`: `upper_arc`, `lower_arc`, `left_bulge`, `right_bulge`, or `small_bend_in`. Optional `arc_lift_in` controls how far the arc bulges outside the endpoints. This is deliberately different from `curve_mode: "smooth"`: the route semantics stay deterministic and the arrowhead remains tangent to the final Bezier segment.
+
+Do not let defaults decide whether a line has an arrowhead. If the source is arrowless, set `arrowhead_policy: "none"` in the plan and `begin_arrow: "none"`, `end_arrow: "none"` in the rendered edge style. If the source has one terminal arrowhead, set `arrowhead_policy: "end_only"` and verify only the final segment has the arrowhead.
+
 ## Why The Vocabulary Is Small
 
 This is deliberate:

@@ -170,13 +170,18 @@ Before authoring the first `edges` array for an exact replica, run a separate ar
 - record every source-visible arrow in `metadata.arrow_plan`
 - each visible arrow or visible line segment gets its own independent `arrow_plan_id`; do not describe a whole local subgraph or multi-hop chain with one plan entry
 - each entry needs `id`, `from_visual_object`, `from_anchor_description`, `to_visual_object`, `to_anchor_description`, `route_shape`, `line_style`, `arrowhead`, `semantic_intent`, `source_bbox_px`, `must_not_cross`, `relative_position_facts`, direction, endpoint/boundary facts, and certainty
+- in strict replica mode, also record `arrow_template` and `arrowhead_policy`. Use the small template vocabulary instead of ad hoc curve wording: `straight_flow`, `vertical_flow`, `orthogonal_flow`, `rounded_orthogonal_flow`, `bezier_arc`, `skip_arc_no_arrow`, `orthogonal_bus_no_arrow`, `feedback_path`, `feedback_loop`, and `boundary_flow`
 - use `semantic_intent: "data_flow"` for normal flow, `"feedback"`/`"loss_backprop"` for dashed return paths, `"boundary_handoff"`/`"frame_output"` for frame-edge arrows, `"merge"`/`"fan_in"` for many-to-one joins, `"fork"`/`"fan_out"` for one-to-many branches, and `"loop_update"` for outer cycles
 - use route shapes such as `straight_horizontal`, `straight_vertical`, `orthogonal`, `rounded_orthogonal`, `smooth_curve`, or `loop`; do not leave major arrows as vague `auto`
+- prefer semantic endpoints such as `encoder:right@0.50 -> decoder:left@0.50`. Use raw `from_point`/`to_point` only when the source arrow is visibly free-floating, and mark that with `allow_free_endpoint` / `freeform_endpoint` in the plan or edge
+- separate arrowed flow from arrowless visual lines. If the source line has no arrowhead, use `arrowhead_policy: "none"` and an arrowless template such as `orthogonal_bus_no_arrow` or `skip_arc_no_arrow`; do not rely on a default arrow style and then hope review catches it
+- for strict paper/architecture arcs, use `arrow_template: "bezier_arc"` with explicit Bezier/control points unless the source is a waveform, decorative hand-drawn line, or true organic/freeform curve. If measured control points are not available yet, put `curve_mode: "bezier"` plus `arc_template: "upper_arc" | "lower_arc" | "left_bulge" | "right_bulge" | "small_bend_in"` on the edge so the renderer creates a deterministic editable arc. Do not use `curve_mode: "smooth"` for ordinary skip arcs just to make them look rounded
+- set `region` / `source_region` and, when useful, `region_regression_group` so repairs can review every related arrow in the same local subsystem after one arrow changes
 - after authoring edges, bind every source-visible edge with `arrow_plan_id`
 - one `arrow_plan_id` may bind to only one scene edge by default. If one source arrow truly needs multiple scene segments, every segment edge must declare `same_source_arrow: true`, `segment_index`, and `segment_count`
 - when a source arrow is unreadable, mark `certainty: "uncertain"` and do not invent its destination
 
-Treat `metadata.arrow_plan` as the source-truth checklist for later visual review: the reviewer should be able to say whether `A001`, `A002`, etc. match the original, rather than writing broad comments like "arrows are wrong".
+Treat `metadata.arrow_plan` as the source-truth checklist for later visual review: the reviewer should be able to say whether `A001`, `A002`, etc. match the original, rather than writing broad comments like "arrows are wrong". In strict mode, run `scripts/arrow_audit_gate.py <scene.json> --strict --write-audit <arrow_audit.json>` to derive the review table; do not hand-maintain a competing arrow audit file.
 
 For attention-like motifs, decompose the visual grammar before drawing scene edges. A source crop that looks like `K/Q -> multiply -> score matrix -> value multiply -> value matrix -> Concat` is not one edge. Record the local motif, then inventory each visible connector separately, for example:
 - `A101`: `K_w` right edge -> `qk_mul` left edge, horizontal, no arrowhead
@@ -310,6 +315,7 @@ For exact replicas, run the rebuild gate after each rendered iteration:
 
 ```powershell
 python ${SKILL_DIR}\scripts\scene_validate.py <scene.json> --strict
+python ${SKILL_DIR}\scripts\arrow_audit_gate.py <scene.json> --strict --write-audit <arrow_audit.json>
 python ${SKILL_DIR}\scripts\style_calibration_gate.py <scene.json> --strict
 python ${SKILL_DIR}\scripts\scene_geometry_assert.py <scene.json> --strict
 python ${SKILL_DIR}\scripts\scene_audit.py <scene.json> --fail-on-rebuild
@@ -318,6 +324,8 @@ python ${SKILL_DIR}\scripts\scene_audit.py <scene.json> --fail-on-rebuild
 In strict mode, missing `source_visual_inventory`, missing `region_plan`, missing strict-dense `style_calibration`, template-seeded starts, and recipe-rewritten exact scenes are treated as gate failures, not informal warnings. If validate/audit/style gates print a blocking contract failure or `[REBUILD]` item, stop coordinate nudging. Rebuild that local subsystem with the correct semantic component (`loop_arrow`, `dashed_region`, `dashed_feedback_path`, `boundary_port`, calibrated ribbon arrows, structured formula groups, etc.) before doing any more visual polishing.
 
 In strict mode, missing `metadata.arrow_plan`, missing `arrow_plan_id` bindings, or route-shape violations are also gate failures. Do not render a strict replica whose long arrows still rely on center-to-center `auto` routing when the source shows fixed horizontal, vertical, boundary, merge, fork, feedback, or loop grammar.
+
+In strict mode, `arrow_audit_gate.py` also treats these as blocking arrow defects: a no-arrow source line rendered with an arrowhead, a flow arrow without exactly one terminal arrowhead, a dashed no-arrow skip/bus line with an arrowhead, a strict flow arrow using raw endpoints without a freeform declaration, a straight/vertical/orthogonal template rendered with the wrong axes, a Bezier/skip arc rendered as generic smooth/Catmull-Rom without an explicit freeform reason, a dangling tiny arrow fragment, or a route crossing a prohibited non-endpoint node. These are topology/visual-grammar failures, not cosmetic issues.
 
 When `metadata.arrow_plan[].geometry_contract` is present, run `scene_geometry_assert.py --strict` before final delivery. Use it for deterministic checks such as `start_y_equals_end_y`, `start_x_equals_end_x`, `endpoint_must_touch`, `target_boundary`, `source_boundary`, raw endpoint alignment, and shared bus alignment through `shared_bus_id` / `shared_bus_axis`. If an edge uses free `from_point` or `to_point` but still must touch a node boundary, declare `source_node` or `target_node` in the contract so the gate can compare the raw point to the intended bbox.
 
@@ -451,6 +459,8 @@ For arrow-dense regions, the review checklist must be per-arrow, not only per-re
 - `[ ] A107 value grid -> Concat matches source`
 
 Blocking review findings should name the exact arrow id and mismatch class: `unbound_source_arrows`, `multi_edge_plan_misuse`, `source_anchor_mismatch`, `route_shape_mismatch`, or `motif_rule_violation`.
+
+When one arrow in a dense region changes, run a region regression pass for every arrow sharing the same `source_region` or `region_regression_group`. Review the local crop and the derived `arrow_audit.json` rows together; do not only inspect the single arrow the user pointed out. The checklist should confirm direction, presence/absence of arrowheads, dashed/solid rhythm, endpoint boundary contact, route shape, curve smoothness, and absence of dangling half-lines for all arrows in that local group.
 
 The no-op gate is mandatory when claiming a new round improved the scene. It fails when:
 - the scene diff is metadata-only

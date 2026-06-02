@@ -239,8 +239,9 @@ def arrow_plan_topology_checklist(scene: dict[str, object] | None) -> list[dict[
             source = plan.get("from_visual_object", plan.get("from", plan.get("source", "source")))
             target = plan.get("to_visual_object", plan.get("to", plan.get("target", "target")))
             route = plan.get("route_shape", "route")
-            arrowhead = plan.get("arrowhead", "arrowhead")
-            source_fact = f"{plan_id}: {source} -> {target}, route={route}, arrowhead={arrowhead}"
+            template = plan.get("arrow_template", plan.get("template", "template"))
+            arrowhead = plan.get("arrowhead_policy", plan.get("arrowhead", "arrowhead"))
+            source_fact = f"{plan_id}: {source} -> {target}, template={template}, route={route}, arrowhead={arrowhead}"
         focus_region = str(plan.get("source_region", plan.get("focus_region", plan.get("region", "arrow_dense")))).strip() or "arrow_dense"
         items.append(
             {
@@ -253,10 +254,12 @@ def arrow_plan_topology_checklist(scene: dict[str, object] | None) -> list[dict[
                 "expected_from_anchor": plan.get("from_anchor_description", plan.get("from_anchor")),
                 "expected_to": plan.get("to_visual_object", plan.get("to")),
                 "expected_to_anchor": plan.get("to_anchor_description", plan.get("to_anchor")),
+                "expected_arrow_template": plan.get("arrow_template", plan.get("template")),
                 "expected_route_shape": plan.get("route_shape"),
                 "expected_line_style": plan.get("line_style"),
-                "expected_arrowhead": plan.get("arrowhead"),
+                "expected_arrowhead": plan.get("arrowhead_policy", plan.get("arrowhead")),
                 "semantic_intent": plan.get("semantic_intent"),
+                "region_regression_group": plan.get("region_regression_group", focus_region),
                 "source_bbox_px": plan.get("source_bbox_px"),
                 "status": default_status,
                 "certainty": certainty if certainty in {"certain", "inferred", "uncertain"} else "certain",
