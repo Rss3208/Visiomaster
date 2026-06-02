@@ -87,6 +87,7 @@ For strict replicas, choose the source arrow template before choosing the edge t
 | `orthogonal_flow` | right-angle routed flow with one arrowhead | `arrow_connector` or `boundary_arrow` with explicit `hv`/`vh`/`orthogonal` route |
 | `rounded_orthogonal_flow` | orthogonal route with rounded corners | `rounded_orthogonal_connector` with explicit corner radius |
 | `bezier_arc` | paper/architecture arc with one arrowhead | `curved_arrow` with `curve_mode: "bezier"` and explicit control points |
+| `fanout_arc` / `branch_arc` | curved source-visible fork branch | `curved_arrow` with `curve_mode: "bezier"`, `arc_template`, source/target tangents, and branch spread |
 | `skip_arc_no_arrow` | curved skip relation without arrowhead | `curved_arrow` with `end_arrow: "none"` and deterministic arc/control points |
 | `orthogonal_bus_no_arrow` | shared trunk/bus/skip line without arrowhead | `line_segment`, `join_connector`, or arrowless orthogonal route |
 | `feedback_path` | dashed return/backprop path | `dashed_feedback_path` or arrowless bus legs plus one final feedback arrow |
@@ -95,7 +96,7 @@ For strict replicas, choose the source arrow template before choosing the edge t
 
 Do not use a generic smooth curve for ordinary paper arcs. `curve_mode: "smooth"` / Catmull-Rom is for waveform, decorative, hand-drawn, organic, or explicitly freeform source curves. A normal skip arc should be a Bezier/arc template so the arrowhead tangent and endpoint relation stay stable.
 
-When the source arc is a standard paper/architecture arc and exact control points are not yet measured, set `curve_mode: "bezier"` and an edge-level `arc_template`: `upper_arc`, `lower_arc`, `left_bulge`, `right_bulge`, or `small_bend_in`. Optional `arc_lift_in` controls how far the arc bulges outside the endpoints. This is deliberately different from `curve_mode: "smooth"`: the route semantics stay deterministic and the arrowhead remains tangent to the final Bezier segment.
+When the source arc is a standard paper/architecture arc and exact control points are not yet measured, set `curve_mode: "bezier"` and an edge-level `arc_template`: `upper_arc`, `lower_arc`, `left_bulge`, `right_bulge`, `fanout_upper`, `fanout_lower`, `branch_upper`, `branch_lower`, or `small_bend_in`. Optional `arc_lift_in` controls how far the arc bulges outside the endpoints; `source_tangent_in` and `target_tangent_in` preserve visible clearance as the line leaves/enters a module; `branch_spread_in` / `fanout_spread_in` keep fork branches soft instead of rigid. This is deliberately different from `curve_mode: "smooth"`: the route semantics stay deterministic and the arrowhead remains tangent to the final Bezier segment.
 
 Do not let defaults decide whether a line has an arrowhead. If the source is arrowless, set `arrowhead_policy: "none"` in the plan and `begin_arrow: "none"`, `end_arrow: "none"` in the rendered edge style. If the source has one terminal arrowhead, set `arrowhead_policy: "end_only"` and verify only the final segment has the arrowhead.
 

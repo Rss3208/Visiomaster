@@ -343,6 +343,7 @@ Supported strict `arrow_template` values are:
 - `orthogonal_flow`: axis-aligned routed flow with one terminal arrowhead.
 - `rounded_orthogonal_flow`: axis-aligned routed flow with rounded 90-degree bends and one terminal arrowhead.
 - `bezier_arc`: deterministic source-like arc with Bezier/control points and one terminal arrowhead.
+- `fanout_arc` / `branch_arc`: one branch in a source-visible fan-out or fork whose source and target should keep a soft curved approach instead of a straight spoke.
 - `skip_arc_no_arrow`: curved or arced skip connector with no arrowhead.
 - `orthogonal_bus_no_arrow`: shared trunk, skip line, or bus segment with no arrowhead.
 - `feedback_path`: dashed feedback/backprop route with the source-visible arrowhead policy.
@@ -367,8 +368,8 @@ Rules for `arrow_plan`:
 - `loop_update` should use one continuous `loop_arrow`, not several line fragments plus a detached arrowhead.
 - `rounded_orthogonal` should use `rounded_orthogonal_connector` or `route: "rounded_orthogonal"` with an explicit corner radius. Do not map it to `smooth_curve`.
 - `bezier_arc` and `skip_arc_no_arrow` should use deterministic Bezier/arc control points. `curve_mode: "smooth"` / Catmull-Rom is allowed only for source-visible waves, decorative/hand-drawn curves, or explicit freeform curves, and should be declared with `allow_smooth_curve: true` or equivalent source facts.
-- If a strict Bezier/skip arc has no hand-measured control points yet, set `curve_mode: "bezier"` plus `arc_template` / `bezier_template` on the edge. Supported templates include `upper_arc`, `lower_arc`, `left_bulge`, `right_bulge`, and `small_bend_in`; optional `arc_lift_in` controls the arc height. The renderer expands these into a stable editable Bezier path instead of a global smooth spline.
-- Arrowed strict flow should use semantic side-ratio endpoints such as `node:right@0.50`. Raw `from_point` / `to_point` is acceptable only for visibly free-floating source lines and should be declared with `allow_free_endpoint` or `freeform_endpoint`.
+- If a strict Bezier/skip/fanout arc has no hand-measured control points yet, set `curve_mode: "bezier"` plus `arc_template` / `bezier_template` on the edge. Supported templates include `upper_arc`, `lower_arc`, `left_bulge`, `right_bulge`, `fanout_upper`, `fanout_lower`, `branch_upper`, `branch_lower`, and `small_bend_in`. Optional `arc_lift_in` controls the arc height/outward bulge, `source_tangent_in` / `target_tangent_in` create source/target clearance before the curve bends, and `branch_spread_in` / `fanout_spread_in` keep fork branches from looking like rigid straight spokes. The renderer expands these into a stable editable Bezier path instead of a global smooth spline.
+- Strict source-visible arrows and lines should use semantic side-ratio endpoints such as `node:right@0.50`, including arrowless bus/skip lines. Raw `from_point` / `to_point` is acceptable only for visibly free-floating source lines and should be declared with `allow_free_endpoint` or `freeform_endpoint`.
 - Arrowless visual lines should be explicit. Use `arrowhead_policy: "none"` with `line_segment`, `join_connector`, or an edge style whose `begin_arrow` and `end_arrow` are both `none`.
 - `scene_validate.py --strict` treats missing or violated arrow-plan bindings as errors.
 - `scripts/arrow_audit_gate.py --strict` treats mismatched arrowhead policy, wrong template axes, unjustified smooth arcs, dangling tiny arrow fragments, and prohibited route crossings as rebuild defects for strict/exact scenes.

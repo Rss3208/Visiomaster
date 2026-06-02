@@ -46,11 +46,13 @@ END_ARROW_TEMPLATES = {
     "orthogonal_flow",
     "rounded_orthogonal_flow",
     "bezier_arc",
+    "fanout_arc",
+    "branch_arc",
     "feedback_loop",
     "feedback_path",
     "boundary_flow",
 }
-CURVE_TEMPLATES = {"bezier_arc", "skip_arc_no_arrow", "feedback_loop"}
+CURVE_TEMPLATES = {"bezier_arc", "skip_arc_no_arrow", "fanout_arc", "branch_arc", "feedback_loop"}
 SMOOTH_ALLOWED_TOKENS = {"wave", "wavy", "decorative", "hand_drawn", "hand-drawn", "freeform", "organic"}
 AUDIT_FIELDS = (
     "id",
@@ -158,6 +160,8 @@ def infer_template(plan: dict[str, Any]) -> str:
         return "orthogonal_flow" if policy != "none" else "orthogonal_bus_no_arrow"
     if route_shape == "rounded_orthogonal":
         return "rounded_orthogonal_flow" if policy != "none" else "orthogonal_bus_no_arrow"
+    if intent in {"fork", "fan_out"} and route_shape in {"curved", "smooth_curve"}:
+        return "fanout_arc"
     if route_shape in {"curved", "smooth_curve", "loop"}:
         return "skip_arc_no_arrow" if policy == "none" or "dash" in line_style else "bezier_arc"
     return "freeform" if route_shape in {"freeform", "diagonal", "short_diagonal"} else ""
@@ -491,14 +495,14 @@ def audit_scene(scene: dict[str, Any], strict: bool = False) -> tuple[list[dict[
                         "Use allow_smooth_curve only for source-visible waves, decorative curves, or hand-drawn/freeform lines."
                     )
 
-            if expected_policy != "none" and not free_endpoint_allowed(plan, edge):
+            if active_plan(plan) and not free_endpoint_allowed(plan, edge):
                 if not endpoint_is_semantic(edge.get("from")) or not endpoint_is_semantic(edge.get("to")):
                     issue(
-                        f"{plan_id}/{edge_id}: strict flow arrow should use semantic side-ratio endpoints like node:right@0.50; "
+                        f"{plan_id}/{edge_id}: strict source-visible arrow/line should use semantic side-ratio endpoints like node:right@0.50; "
                         "raw points are allowed only when the source arrow is visibly free-floating."
                     )
                 direction = str(plan.get("direction", "")).strip().lower()
-                if direction and not direction_matches(edge, direction):
+                if expected_policy != "none" and direction and not direction_matches(edge, direction):
                     issue(f"{plan_id}/{edge_id}: endpoint sides do not match declared direction `{direction}`.")
 
             if points:

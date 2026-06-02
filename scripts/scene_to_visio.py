@@ -6488,26 +6488,68 @@ def standardized_bezier_arc_points(
     lift = float(edge.get("arc_lift_in", style.get("arc_lift_in", max(0.16, min(1.1, distance * 0.28)))) or 0.16)
     template = template.lower().replace("-", "_")
 
+    def endpoint_outward(endpoint: Any, fallback: tuple[float, float]) -> tuple[float, float]:
+        if not isinstance(endpoint, str) or ":" not in endpoint:
+            return fallback
+        side = endpoint.split(":", 1)[1].split("@", 1)[0].lower()
+        if side == "left":
+            return (-1.0, 0.0)
+        if side == "right":
+            return (1.0, 0.0)
+        if side == "top":
+            return (0.0, -1.0)
+        if side == "bottom":
+            return (0.0, 1.0)
+        return fallback
+
+    def with_endpoint_tangents(
+        default_c1: tuple[float, float],
+        default_c2: tuple[float, float],
+    ) -> list[tuple[float, float]]:
+        source_tangent = edge.get("source_tangent_in", edge.get("start_tangent_in", style.get("source_tangent_in")))
+        target_tangent = edge.get("target_tangent_in", edge.get("end_tangent_in", style.get("target_tangent_in")))
+        c1 = default_c1
+        c2 = default_c2
+        if isinstance(source_tangent, (int, float)) and float(source_tangent) > 0:
+            vx, vy = endpoint_outward(edge.get("from"), (1.0 if dx >= 0 else -1.0, 0.0))
+            if abs(vx) >= abs(vy):
+                c1 = (sx + vx * float(source_tangent), sy)
+            else:
+                c1 = (sx, sy + vy * float(source_tangent))
+        if isinstance(target_tangent, (int, float)) and float(target_tangent) > 0:
+            vx, vy = endpoint_outward(edge.get("to"), (-1.0 if dx >= 0 else 1.0, 0.0))
+            if abs(vx) >= abs(vy):
+                c2 = (ex + vx * float(target_tangent), default_c2[1])
+            else:
+                c2 = (default_c2[0], ey + vy * float(target_tangent))
+        return [start, c1, c2, end]
+
     if template in {"upper", "up", "top", "above", "over", "upper_arc", "top_arc", "over_arc"}:
         cy = min(sy, ey) - lift
-        return [start, (sx + dx * 0.25, cy), (sx + dx * 0.75, cy), end]
+        return with_endpoint_tangents((sx + dx * 0.25, cy), (sx + dx * 0.75, cy))
     if template in {"lower", "down", "bottom", "below", "under", "lower_arc", "bottom_arc", "under_arc"}:
         cy = max(sy, ey) + lift
-        return [start, (sx + dx * 0.25, cy), (sx + dx * 0.75, cy), end]
+        return with_endpoint_tangents((sx + dx * 0.25, cy), (sx + dx * 0.75, cy))
     if template in {"left", "left_bulge", "left_arc", "outside_left"}:
         cx = min(sx, ex) - lift
-        return [start, (cx, sy + dy * 0.20), (cx, sy + dy * 0.80), end]
+        return with_endpoint_tangents((cx, sy + dy * 0.20), (cx, sy + dy * 0.80))
     if template in {"right", "right_bulge", "right_arc", "outside_right", "right_then_in"}:
         cx = max(sx, ex) + lift
-        return [start, (cx, sy + dy * 0.20), (cx, sy + dy * 0.80), end]
+        return with_endpoint_tangents((cx, sy + dy * 0.20), (cx, sy + dy * 0.80))
+    if template in {"fanout", "fanout_arc", "fanout_upper", "fanout_lower", "branch_arc", "branch_upper", "branch_lower", "split_arc"}:
+        spread = float(edge.get("branch_spread_in", edge.get("fanout_spread_in", style.get("branch_spread_in", lift))) or lift)
+        direction = -1.0 if template in {"fanout_upper", "branch_upper"} or (template in {"fanout_arc", "fanout", "branch_arc", "split_arc"} and ey < sy) else 1.0
+        c1 = (sx + dx * 0.38, sy + direction * spread * 0.55)
+        c2 = (sx + dx * 0.72, ey - direction * spread * 0.18)
+        return with_endpoint_tangents(c1, c2)
     if template in {"small_bend_in", "soft_bend_in"}:
-        return [start, (sx + dx * 0.55, sy), (ex - dx * 0.15, ey), end]
+        return with_endpoint_tangents((sx + dx * 0.55, sy), (ex - dx * 0.15, ey))
 
     if abs(dx) >= abs(dy):
         cy = min(sy, ey) - lift
-        return [start, (sx + dx * 0.25, cy), (sx + dx * 0.75, cy), end]
+        return with_endpoint_tangents((sx + dx * 0.25, cy), (sx + dx * 0.75, cy))
     cx = max(sx, ex) + lift
-    return [start, (cx, sy + dy * 0.20), (cx, sy + dy * 0.80), end]
+    return with_endpoint_tangents((cx, sy + dy * 0.20), (cx, sy + dy * 0.80))
 
 
 def edge_route_points(
@@ -6571,7 +6613,7 @@ def edge_route_points(
 
     if curve_mode == "bezier" and (
         arc_template
-        or arrow_template in {"bezier_arc", "skip_arc_no_arrow", "feedback_loop"}
+        or arrow_template in {"bezier_arc", "skip_arc_no_arrow", "feedback_loop", "fanout_arc", "branch_arc"}
         or edge.get("standardize_bezier_arc")
     ):
         return standardized_bezier_arc_points(start, end, arc_template or arrow_template or "auto", edge, style)
