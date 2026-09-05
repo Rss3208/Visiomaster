@@ -163,6 +163,13 @@ def scan(doc: dict) -> list[dict]:
                 add(hints, f"node[{nid}] ({ntype})",
                     f"text contains `_`/`^` in `{text[:60]}`",
                     "use type math_text with math_render_mode fragments (underscore is legal fragment encoding only inside math components)")
+        # strict validate treats an undeclared min_font as 55% of font size and fails
+        style = node.get("style") if isinstance(node.get("style"), dict) else {}
+        fs = style.get("font_size_pt") or node.get("font_size_pt")
+        if isinstance(fs, (int, float)) and not style.get("min_font_size_pt"):
+            add(hints, f"node[{nid}]",
+                "no explicit min_font_size_pt (validator defaults to 55% of font size and fails strict)",
+                f'set style min_font_size_pt to about {round(max(6.0, fs * 0.7), 1)} (>= 60% of font)')
         if str(node.get("type", "")) in {"text_block", "caption_block"}:
             # only single-line-prolonged text is a wrap risk; multi-line labels
             # (with \n or short text) legitimately omit a wrap policy
