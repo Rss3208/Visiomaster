@@ -27,6 +27,7 @@ STRICT_DENSE_REQUIRED_CROP_TYPES = {
     "paper_3d",
     "output_label",
 }
+DEFECT_CLASSES = {"A", "B", "C", "D", "E", "F", "G"}
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -170,6 +171,40 @@ def validate_items(items: list[dict[str, Any]], kind: str, failures: list[str], 
     return ids
 
 
+def validate_sweep(
+    findings: list[dict[str, Any]],
+    failures: list[str],
+    warnings: list[str],
+) -> None:
+    """Class-sweep completeness: every finding must name its defect class and sweep the page.
+
+    SKILL.md rule 94: a reviewer who finds one instance must answer "how many more of
+    the same class exist page-wide". Findings without `similar_instance_count` leave
+    the repair stage unable to run a class-wide fix.
+    """
+    for index, finding in enumerate(findings):
+        if not isinstance(finding, dict):
+            continue
+        finding_id = str(finding.get("id", "")).strip() or f"findings[{index}]"
+        class_id = str(finding.get("class_id", "")).strip().upper()
+        if not class_id:
+            failures.append(f"{finding_id} is missing class_id (A-G defect taxonomy).")
+            continue
+        if class_id not in DEFECT_CLASSES:
+            failures.append(f"{finding_id} has invalid class_id `{class_id}` (expected one of {sorted(DEFECT_CLASSES)}).")
+        count = finding.get("similar_instance_count")
+        if count is None or isinstance(count, bool) or not isinstance(count, int):
+            failures.append(
+                f"{finding_id} is missing integer `similar_instance_count`; the reviewer must sweep the page for the same class."
+            )
+            continue
+        locations = finding.get("similar_locations")
+        if count > 1 and (not isinstance(locations, list) or not locations):
+            failures.append(
+                f"{finding_id} reports {count} same-class instances but `similar_locations` is empty."
+            )
+
+
 def validate_region_scores(
     value: object,
     failures: list[str],
@@ -234,6 +269,11 @@ def main() -> int:
     parser.add_argument("findings", help="Path to review_findings.json")
     parser.add_argument("--manifest", help="Optional review_manifest.json; used to verify local original path.")
     parser.add_argument("--require-failed-refs", action="store_true", help="Require non-acceptable findings to cite checklist_refs.")
+    parser.add_argument(
+        "--require-sweep",
+        action="store_true",
+        help="Require every finding to carry class_id (A-G) and a page-wide same-class sweep (similar_instance_count / similar_locations).",
+    )
     parser.add_argument("--final", action="store_true", help="Require region_scores and fail if any critical region score is fail or not_reviewed.")
     parser.add_argument(
         "--strict-dense",
@@ -291,6 +331,9 @@ def main() -> int:
         if args.require_failed_refs and severity in {"blocking", "important", "general"} and failed_ids and not refs:
             failures.append(f"{finding_id} must cite checklist_refs.")
 
+    if args.require_sweep:
+        validate_sweep(findings, failures, warnings)
+
     required_crop_types: set[str] = set()
     if args.strict_dense and args.final:
         required_crop_types |= STRICT_DENSE_REQUIRED_CROP_TYPES
@@ -327,6 +370,8 @@ def main() -> int:
         "failed_checklist_ids": sorted(failed_ids),
         "failed_regions": failed_regions,
         "required_crop_types": sorted(required_crop_types),
+        "sweep_required": bool(args.require_sweep),
+        "finding_count": len(findings),
     }
     if args.output_report:
         output_path = Path(args.output_report).resolve()

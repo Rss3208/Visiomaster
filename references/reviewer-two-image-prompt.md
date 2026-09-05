@@ -11,7 +11,7 @@ You will receive only:
 
 Do not ask for pair images, crop packs, overlays, prior scene JSON, audit logs, or intended fixes.
 
-If the task explicitly provides one or two targeted local crop pairs, use them only to inspect the named local defect. Do not treat a global pair/contact sheet as a substitute for the two full images, because it can downscale away fine connector, operator, formula, and text defects.
+If the task provides targeted local crop pairs (at most six, chosen by the orchestrator from arrow-dense, formula, and small-text regions), use them to confirm A/B/C-class defects at crop scale. Do not treat a global pair/contact sheet as a substitute for the two full images, because it can downscale away fine connector, operator, formula, and text defects.
 
 ## Task
 
@@ -19,14 +19,17 @@ Compare the two images visually and decide whether the replica is a source-faith
 
 Do not only describe global similarity. If a region checklist, region id, crop intent, or local acceptance checklist is provided as context, inspect each region separately and answer whether that region passes. A globally similar figure can still fail when one local region has wrong arrows, broken formulas, line-through-text, or unexpected dashed/grid fragments.
 
-Focus on visible fidelity only:
+Focus on visible fidelity only, sweeping each class from `references/defect-taxonomy.md` page-wide:
 
 - global layout and aspect
 - module count and placement
 - local topology
-- arrow direction, landing points, and route shape (straight, orthogonal, rounded orthogonal, smooth curve, loop)
+- arrow direction, landing points, route shape (straight, orthogonal, rounded orthogonal, smooth curve, loop), endpoint contact, breaks, overshoot, head-only fragments, and corner spurs
+- formula and subscript rendering (raw `_`/`^`, split subscripts, missing fraction bars)
+- text integrity (wrapped single-line labels, split words, text-over-graphic overlap)
+- missing and extra elements, including small panel-internal details
+- raster policy: grid/matrix/cell-stack/legend-sample/simple-icon content that ships as a pasted image is a defect; only photographic or complex-bitmap content may stay raster
 - node/component visual grammar
-- text appearance
 - density, spacing, and alignment
 - container and boundary grammar
 - strict dense local details: arrow_dense, formula_dense, rotated_text, small_text, legend, paper_3d, and output_label areas when present
@@ -97,6 +100,7 @@ Use this schema:
     {
       "id": "F001",
       "severity": "blocking",
+      "class_id": "A",
       "summary": "Short one-line defect title",
       "visible_diff": "Concrete visual difference between source and replica.",
       "source_appearance": "What the source visibly looks like in that area.",
@@ -104,6 +108,8 @@ Use this schema:
       "impact_on_fidelity": "Why this difference matters for source-faithful reconstruction.",
       "focus_regions": ["output_right"],
       "checklist_refs": ["T001", "V001"],
+      "similar_instance_count": 1,
+      "similar_locations": [],
       "expected_visible_change": "What should visibly change after regeneration."
     }
   ]
@@ -119,6 +125,9 @@ The checklist fields are mandatory for exact-replica reviews:
 - For strict dense replicas, full-page-only review is insufficient for `arrow_dense`, `formula_dense`, `rotated_text`, `small_text`, `legend`, `paper_3d`, or `output_label` regions. If those regions are supplied, inspect them locally and include `region_scores`.
 - `status`: use `pass`, `fail`, or `uncertain`.
 - `certainty`: use `certain`, `inferred`, or `uncertain`.
+- `class_id`: one of the taxonomy classes A-G (see `references/defect-taxonomy.md`); required for every finding.
+- `similar_instance_count`: after finding one instance, sweep the whole page for the same class and report the total count (1 if unique). Do not report only the first instance you see.
+- `similar_locations`: list the other same-class locations when `similar_instance_count` > 1; for class E findings this is the per-tile verdict list.
 - Use `uncertain` instead of inventing details when a source crop is unclear.
 - Every non-acceptable finding should cite failed checklist items through `checklist_refs` when possible.
 - Every region score with `fail` must cite concrete finding ids in `blocking_findings`; do not mark a region failed without saying what visible defect caused the failure.

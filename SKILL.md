@@ -316,8 +316,11 @@ For exact replicas, run the rebuild gate after each rendered iteration:
 ```powershell
 python ${SKILL_DIR}\scripts\scene_validate.py <scene.json> --strict
 python ${SKILL_DIR}\scripts\arrow_audit_gate.py <scene.json> --strict --write-audit <arrow_audit.json>
+python ${SKILL_DIR}\scripts\arrow_micro_geometry_gate.py <scene.json> --strict
 python ${SKILL_DIR}\scripts\style_calibration_gate.py <scene.json> --strict
 python ${SKILL_DIR}\scripts\scene_geometry_assert.py <scene.json> --strict
+python ${SKILL_DIR}\scripts\text_render_audit.py <scene.json> --strict
+python ${SKILL_DIR}\scripts\raster_policy_audit.py <scene.json> --strict
 python ${SKILL_DIR}\scripts\scene_audit.py <scene.json> --fail-on-rebuild
 ```
 
@@ -737,6 +740,14 @@ Why this matters:
 88. During visual review, inspect local crops for text and formula wrapping. Broken `GELU`, `LayerNorm`, CJK labels, or subscript variables are blocking/important visual defects even if validate/audit passes. Fix with role-specific fonts, `text_fit`, smaller local font scales, or `math_text`; do not hide the problem by enlarging the whole module.
 89. For labels such as `f_tf`, `g_hrrp`, `f_fused`, and `S_i`, use `math_text` or `math_label_box` so only the visible variable is the base and the rest is subscript. If visual review reports `f_t^f`-like rendering, split letters, or `fuse d` spacing, classify it as formula rendering failure.
 90. For every complex figure iteration, record the reviewed images, main visual differences, cross-image common issues, skill changes, improved/unchanged/regressed figures, and remaining failures. A global contact sheet can help navigation but is not valid evidence for fine-detail acceptance. Prefer two full images plus targeted local crops over global pair images for fine-detail review.
+91. Raster/paste policy: every geometric or rule-regular graphic (grid tables, matrices, color-block stacks, legend samples, simple icons, process boxes, arrows) must be rebuilt as editable components. `image_tile` is allowed only for photographic, complex-bitmap, or otherwise-unreadable source content, and every tile must register `justification` (`photographic` / `complex_bitmap` / `source_unreadable_otherwise`) plus `source_bbox_px`. Keep total raster area under 8% of the page or justify it in the delivery notes. Enforce with `scripts/raster_policy_audit.py <scene.json> --strict`.
+92. Subscript and wrap policy: rendered text must never contain a literal `_` or `^`; word-like subscripts (`L_adv`, `P_RGB`, `f_fused`) belong on `math_text` fragments. Source single-line labels must declare `single_line`/`no_wrap` and must not wrap; never hide a wrap by enlarging the whole module. Enforce with `scripts/text_render_audit.py <scene.json> --strict`. Inside `math_text` the underscore is legal fragment encoding; the audit exempts math components for that reason.
+93. Arrow micro-geometry contract: before delivery, every edge must visibly touch its target boundary without overshooting past it, must not render as a bare arrowhead with no line body, and orthogonal routes must not carry tiny off-direction jogs at bends. Enforce with `scripts/arrow_micro_geometry_gate.py <scene.json> --strict` (source-pixel scenes only). Full-page review cannot reliably see a few pixels of line body, so this gate is the deterministic backstop for that defect class.
+94. Class sweep: when a review finds one defect instance, it must answer "how many more of the same class exist page-wide". Record this as `class_id` (defect taxonomy A-G, see `references/defect-taxonomy.md`), `similar_instance_count`, and `similar_locations` on each finding, and repair all same-class instances in one pass. Enforce completeness with `review_checklist_gate.py --require-sweep`.
+95. Post-repair verification: repair all planned defect classes first, then re-render once and verify every repaired region through source-vs-replica crop pairs in a single batched pass. Only a region that fails verification gets a targeted extra render cycle (at most two). Do not re-render once per class; Visio export is the most expensive operation in the loop.
+96. Review resolution: `arrow_dense`, `formula`, and `small_text` regions must be reviewed through local crop pairs, not from the full page alone. A full-page pass is only the anchor; A/B/C-class defects are confirmed at crop scale.
+97. Findings persistence: every review round must persist its structured conclusion as `review_findings.json` (the main session writes it when the reviewer runs in a clean subagent). A review that leaves no findings file is a process failure, because the next round cannot diff against it.
+98. Definition of done (strict mode): all strict gates green (`scene_validate`, `arrow_audit_gate`, `arrow_micro_geometry_gate`, `style_calibration_gate`, `scene_geometry_assert`, `scene_audit --fail-on-rebuild`, `text_render_audit`, `raster_policy_audit`), `review_checklist_gate` passing with `--require-sweep` where findings exist, `round_noop_gate` proving the final round changed pixels, and the three deliverable files present and non-empty.
 
 ## References
 
@@ -751,7 +762,11 @@ Why this matters:
 - `scripts/scene_complexity.py`: preflight report for large/dense figures before Visio rendering
 - `scripts/font_inventory.py`: local Windows font inventory and preferred role fallback check
 - `scripts/stage_source_image.py`: copies a source image into `source/original.<ext>` and records hashes for stable strict review manifests
-- `scripts/review_checklist_gate.py`: validates `topology_checklist`, `visual_checklist`, `fidelity_checklist`, local source-image paths, and `checklist_refs` before rebuild planning
+- `scripts/review_checklist_gate.py`: validates `topology_checklist`, `visual_checklist`, `fidelity_checklist`, local source-image paths, and `checklist_refs` before rebuild planning; `--require-sweep` enforces per-finding class sweep completeness
+- `scripts/text_render_audit.py`: deterministic audit for raw `_`/`^` text, math labels on plain text components, likely single-line wraps, and container overflow
+- `scripts/raster_policy_audit.py`: deterministic audit for unregistered raster tiles, redrawable-class paste violations, and raster area share
+- `scripts/arrow_micro_geometry_gate.py`: deterministic audit for endpoint overshoot, head-only arrow fragments, and corner spurs
+- `references/defect-taxonomy.md`: the A-G defect classification shared by review prompts and gates
 - `scripts/scene_autofix.py`: deterministic GAN/TFR local grammar upgrade pass before Visio rendering
 - `docs/updates/2026-05-19-multimodal-paper-figure.md`: detailed analysis of a complex multimodal paper figure and the related component upgrade
 
