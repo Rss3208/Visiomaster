@@ -229,6 +229,14 @@ Starter generation:
 python ${SKILL_DIR}\scripts\image_to_scene.py --image <source.png> --output <scene.json>
 ```
 
+After authoring or editing a strict scene, run the advisory grammar scanner before the first validate pass. It prints each schema mistake together with the exact correct spelling (validator vocabularies, junction requirements, strict metadata fields), so grammar is fixed in one pass instead of by trial and error:
+
+```powershell
+python ${SKILL_DIR}\scripts\schema_hints.py <scene.json>
+```
+
+It is advisory only (exit 0 with hints) and never suggests content or layout; source-image analysis stays the only source of visual decisions. The full wrong→correct table lives in `references/scene-grammar-pitfalls.md`.
+
 This script does not infer the real diagram structure from pixels. It only writes a blank or template starter scene. The actual first-pass `scene.json` for exact work must still be authored by the LLM from the source image.
 
 For exact large-figure reconstruction, start in source pixels and record the region strategy:
@@ -752,6 +760,8 @@ Why this matters:
 ## References
 
 - `references/scene-schema.md`: `scene.json` fields and coordinate rules
+- `references/scene-grammar-pitfalls.md`: wrong→correct table for strict scene grammar (directions, junctions, strict metadata fields, renderer gotchas)
+- `scripts/schema_hints.py`: advisory authoring-time scanner that prints each grammar mistake with its exact correct spelling
 - `references/visio-component-map.md`: supported components and renderer intent
 - `references/visio-export-flow.md`: Windows + Visio export path and current limitations
 - `templates/style_profiles.json`: `paper_white` and `clean_white` rendering profiles
