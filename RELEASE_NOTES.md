@@ -1,3 +1,31 @@
+# v0.3.2
+
+New in v0.3.2 — deterministic quality gates and authoring accelerators, distilled
+from 58 automated production runs (65 human correction rounds):
+
+- Three new strict gates: `text_render_audit.py` (raw `_`/`^`, math labels, wrap,
+  container overflow), `raster_policy_audit.py` (tile registration, redrawable-class
+  paste, area budget), `arrow_micro_geometry_gate.py` (endpoint overshoot, head-only
+  fragments, corner spurs).
+- `review_checklist_gate.py --require-sweep`: every review finding must carry a
+  defect class (A-G, see `references/defect-taxonomy.md`) and a page-wide
+  same-class sweep count.
+- Reviewer prompt: up to six orchestrator-selected crop pairs; raster-policy class
+  added; sweep fields required in findings.
+- SKILL.md rules 91-98: raster policy, subscript/wrap policy, arrow micro-geometry
+  contract, class sweep, post-repair verification, review resolution, findings
+  persistence, strict definition of done.
+- `scripts/schema_hints.py` + `references/scene-grammar-pitfalls.md`: advisory
+  authoring-time grammar pre-check with exact correct spellings.
+- `references/component-cheatsheet.md`: source-morphology to candidate-component
+  decision aid with discriminating features and renderer gotchas.
+- `tests/test_gates_v04.py`: 22 unit tests covering the new gates.
+
+Verified on two production-grade replay benchmarks: review recall on human
+correction items improved 17%->83% / 67%->92% / 100% (no false-positive increase);
+blind A/B preferred the gated pipeline; end-to-end time on the same figure dropped
+143 -> 52 minutes across internal iterations with zero checklist regressions.
+
 # Visiomaster v0.3.1 更新说明
 
 本次更新聚焦“箭头拓扑审查与重建闭环”。它不是新增某一类固定图形模板，而是让局部拓扑复杂、连接语义强的图在复刻、审查、修复和下一轮重建之间更可追踪。
