@@ -254,6 +254,8 @@ For exact replicas, add typography intent when the source uses distinctive fonts
 
 Supported `font_role` values are `paper_serif`, `serif`, `ui_sans`, `sans`, `math`, `mono`, `cjk_sans`, and `cjk_serif`. The renderer resolves `font_family` / `font_family_candidates` against locally installed Windows fonts. If a requested font is missing, it picks a close role fallback; if `source_font_family` is installed but the scene resolves to a different font, `scene_audit.py` reports the mismatch.
 
+For CJK text, the renderer applies the resolved family to both Visio's `Char.Font` and `Char.AsianFont` cells. Visio picks the font for East Asian glyphs (e.g. `langID 2052`) from the Asian-font cell; setting only `Char.Font` lets the theme East Asian font (SimSun / 宋体) silently override the requested CJK family in exported SVG/PNG.
+
 For high-fidelity paper figures, record the source-region plan before local polishing. This is a visual-analysis contract, not an automatic detector:
 
 ```json
