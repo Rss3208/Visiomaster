@@ -53,6 +53,32 @@ Use the active thread default Python interpreter. If the user or project provide
 python
 ```
 
+### Resolving `${SKILL_DIR}` (portable skill usage)
+
+`${SKILL_DIR}` is a **placeholder**, not a built-in environment variable. It stands for the absolute path of the directory that contains this `SKILL.md` (the installed skill's base directory). The commands in this file and in `references/` use it so they work from any current working directory.
+
+Set it once in the shell before running any command that contains it:
+
+```powershell
+$SKILL_DIR = 'C:\path\to\the\installed\skill'
+python ${SKILL_DIR}\scripts\scene_validate.py <scene.json>
+```
+
+`${SKILL_DIR}` is valid PowerShell syntax for `$SKILL_DIR`, so every existing command works verbatim once that variable is set. On Bash/macOS, use `export SKILL_DIR=/path/to/skill` and `python "$SKILL_DIR/scripts/scene_validate.py"` instead.
+
+Hosts differ in how they expose the base directory:
+
+- **Codex / local CLI**: the skill is installed at `~/.codex/skills/visiomaster` (see `README.md`), so `SKILL_DIR` is simply that path; running from inside the skill directory with `python .\scripts\...` also works.
+- **Custom agent hosts**: most skill loaders report the base directory when the skill is loaded (for example DeepSeek Harness returns "Base directory for this skill: ..." in its `<skill_resources>` block). Use that reported path as `SKILL_DIR`. If the host defines its own variable, substitute it in place of `$SKILL_DIR`.
+- **Anything else**: find the directory containing `SKILL.md` and use its absolute path.
+
+Rules:
+
+- Keep the current working directory in the user's workspace. Do **not** `cd` into the skill directory, so `<scene.json>`, `<exports>` and other outputs land where the user expects.
+- Do **not** rewrite `${SKILL_DIR}\scripts\...` into bare relative paths. The scripts import sibling modules by filename (for example `scene_validate.py` imports `font_utils` and `scene_to_visio`) and rely on Python putting the script's own directory on `sys.path`; they must be invoked through an anchored script path.
+- Invoke with `python <path>\<script>.py`, never `python -m`, for the same reason.
+- Verify the environment at any time with `python ${SKILL_DIR}\scripts\check_visio_env.py` (exit code 0 means Visio COM is ready).
+
 ## Workflow
 
 ### 1. Confirm scope

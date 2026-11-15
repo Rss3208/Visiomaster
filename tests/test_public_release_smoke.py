@@ -43,6 +43,19 @@ def test_public_release_files_are_present() -> None:
         assert (ROOT / rel).exists(), rel
 
 
+def test_skill_dir_placeholder_is_documented() -> None:
+    """`${SKILL_DIR}` is a placeholder, but was left unexplained in docs.
+
+    Every doc that uses the placeholder must also explain how to resolve it,
+    otherwise the command examples are not runnable on a non-Codex host.
+    """
+    for rel in ["SKILL.md", "README.md", "references/scene-schema.md", "references/visio-export-flow.md"]:
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        if "${SKILL_DIR}" in text:
+            assert "placeholder" in text.lower() or "占位符" in text, rel
+            assert "resolving" in text.lower() or "解析" in text or "占位符" in text, rel
+
+
 def test_basic_scene_validates() -> None:
     result = run_script("scene_validate.py", str(ROOT / "templates" / "examples" / "basic_flow.scene.json"))
     assert result.returncode == 0, result.stdout + result.stderr

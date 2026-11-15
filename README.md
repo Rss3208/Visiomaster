@@ -122,6 +122,23 @@ python .\sync_to_skill.py --skill-dir "$env:USERPROFILE\.codex\skills\visiomaste
 
 `--merge-skill-md` 会尽量保留目标 skill 中的本机环境设置。
 
+## 在其他 agent / 自定义宿主中使用
+
+`SKILL.md` 并不绑定 Codex，任何能读取 `SKILL.md` 并调用 `scripts/` 的本地代理都可以使用同一套流程（渲染阶段的硬性要求仍是 Windows + 本机 Visio + Python + `pywin32`）。
+
+`SKILL.md` 与 `references/` 里的命令使用 `${SKILL_DIR}` 占位符表示「包含 `SKILL.md` 的目录的绝对路径」。它**不是**内置环境变量，请先按宿主提供的方式解析：
+
+```powershell
+$SKILL_DIR = 'C:\path\to\the\installed\skill'
+python ${SKILL_DIR}\scripts\scene_validate.py <scene.json>
+```
+
+- Codex / 本地 CLI：把 skill 安装到某个目录，`$SKILL_DIR` 就是该目录；在 skill 目录内用 `python .\scripts\...` 相对路径也可以。
+- 自定义 agent 宿主：多数加载器会在加载 skill 时报告 base directory（例如 DeepSeek Harness 在 `<skill_resources>` 中返回 "Base directory for this skill: ..."），把它作为 `$SKILL_DIR`；若宿主自带变量，替换 `$SKILL_DIR` 即可。
+- 保持当前工作目录在你的 workspace，不要 `cd` 进 skill 目录；并且务必用 `python <绝对路径>\<脚本>.py` 调用，因为脚本按文件名 import 同级模块（如 `font_utils`、`scene_to_visio`），依赖 Python 把脚本所在目录放进 `sys.path`。
+
+详见 `SKILL.md` 的 "Resolving `${SKILL_DIR}`" 小节。
+
 ## 快速开始
 
 校验一个示例 scene：
