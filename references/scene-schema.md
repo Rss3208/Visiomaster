@@ -1,5 +1,7 @@
 # Scene Schema
 
+> **Command paths:** `${SKILL_DIR}` in the command examples below is a placeholder for the installed skill's base directory, not a built-in variable. Set it once before running the commands (see the "Resolving `${SKILL_DIR}`" section in `SKILL.md`). Keep the current working directory in your workspace and invoke scripts through that anchored path, because they import sibling modules by filename.
+
 ## Purpose
 
 `scene.json` is the intermediate semantic format between image analysis and Visio rendering.
