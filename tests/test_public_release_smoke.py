@@ -343,3 +343,42 @@ def test_arrow_plan_gate_rejects_diagonal_horizontal_arrow(tmp_path: Path) -> No
     result = run_script("scene_validate.py", str(scene), "--strict")
     assert result.returncode != 0
     assert "expects a horizontal arrow" in (result.stdout + result.stderr)
+
+
+def test_apply_style_sets_asian_font_for_cjk_text() -> None:
+    """CJK glyphs use Visio's Asian-font cell, so Char.Font alone is not enough.
+
+    Regression test for the case where a scene requests SimHei / Microsoft
+    YaHei but exported SVGs contain the theme East Asian font (宋体 / SimSun).
+    It runs without a live Visio COM instance by using a minimal fake shape.
+    """
+    from scene_to_visio import apply_style
+
+    class FakeCell:
+        def __init__(self) -> None:
+            self.FormulaU: str | None = None
+            self.ResultIU: float | None = None
+
+    class FakeShape:
+        def __init__(self) -> None:
+            self.cells: dict[str, FakeCell] = {}
+
+        def CellsU(self, name: str) -> FakeCell:
+            return self.cells.setdefault(name, FakeCell())
+
+    shape = FakeShape()
+    apply_style(
+        shape,
+        {
+            "font_family": "SimHei",
+            "font_role": "cjk_sans",
+            "font_weight": "bold",
+            "text_fit": "none",
+            "text_color": "#1E2436",
+            "font_size_pt": 18,
+        },
+        "新增图书",
+    )
+
+    assert shape.cells["Char.Font"].FormulaU == 'FONT("SimHei")'
+    assert shape.cells["Char.AsianFont"].FormulaU == 'FONT("SimHei")'

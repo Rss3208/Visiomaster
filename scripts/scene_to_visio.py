@@ -1116,6 +1116,11 @@ def apply_style(
     font_family = font_resolution.resolved or style.get("font_family")
     if font_family:
         try_set_formula(shape, "Char.Font", f'FONT("{font_family}")')
+        # Visio routes CJK (langID 2052) glyphs through the Asian-font cell, not
+        # Char.Font. Without this, Chinese text silently renders in the theme's
+        # East Asian font (e.g. SimSun / 宋体) even when a CJK font such as
+        # SimHei or Microsoft YaHei was requested.
+        try_set_formula(shape, "Char.AsianFont", f'FONT("{font_family}")')
 
     char_style = font_style_value(style)
     if char_style:
